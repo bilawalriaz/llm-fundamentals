@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>What Everyone Missed — Cross-Paper Synthesis</title>
+  <meta name="description" content="Novel insights that emerge from reading all 18 LLM papers together — contradictions, blind spots, and the hidden structure of the field.">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Noto+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --swi-ink: #000000;
+      --swi-muted: #666;
+    }
+    body {
+      font-family: 'Noto Sans', sans-serif;
+      color: #000;
+      background: #ffffff;
+    }
+    .swi-gradient {
+      background: linear-gradient(90deg, #d4380d, #fa541c, #fa8c16);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-weight: bold;
+    }
+    .publication-title {
+      font-family: 'Google Sans', sans-serif;
+      font-size: 2.6rem;
+      line-height: 1.15;
+      letter-spacing: -0.01em;
+      font-weight: 700;
+    }
+    .publication-body {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 1.08rem;
+      line-height: 1.7;
+      color: #111;
+    }
+    .publication-body p { margin-bottom: 1.1rem; }
+    .publication-body a {
+      color: #000;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+    }
+    .publication-body a:hover { border-bottom-color: #000; }
+    .publication-body strong { color: #000; }
+    .publication-body code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.92em;
+      background: #f5f5f5;
+      padding: 0.1em 0.4em;
+      border-radius: 4px;
+      color: #111;
+      font-weight: 500;
+    }
+    .swi-callout {
+      display: flex;
+      gap: 14px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin: 1.5rem 0;
+    }
+    .swi-callout-icon { font-size: 1.4rem; flex-shrink: 0; }
+    .swi-callout-body { font-size: 0.97rem; line-height: 1.6; }
+    .swi-pullquote {
+      margin: 2rem 0;
+      padding: 16px 24px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      font-style: italic;
+      font-size: 1.1rem;
+      line-height: 1.65;
+      color: #333;
+    }
+    .swi-pullquote p { margin: 0; }
+    .swi-steps {
+      display: flex;
+      gap: 20px;
+      margin: 1.5rem 0;
+    }
+    .swi-step {
+      flex: 1;
+      display: flex;
+      gap: 12px;
+      background: #f5f5f5;
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .swi-step-number {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #000;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+      flex-shrink: 0;
+    }
+    .swi-step-content h4 {
+      font-size: 0.95rem;
+      margin-bottom: 0.3rem;
+      color: #000;
+    }
+    .swi-step-content p {
+      font-size: 0.88rem;
+      line-height: 1.45;
+      color: #555;
+      margin: 0;
+    }
+    .swi-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: 'Google Sans', sans-serif;
+      font-size: 0.95rem;
+      margin: 1.5rem 0;
+    }
+    .swi-table th, .swi-table td {
+      padding: 12px 16px;
+      text-align: left;
+    }
+    .swi-table th {
+      font-weight: 700;
+      color: #000;
+      border-bottom: 2px solid #000;
+    }
+    .swi-table td {
+      border-bottom: 1px solid #eee;
+    }
+    .swi-table tr:last-child td { border-bottom: none; }
+    .swi-table td:first-child { font-weight: 600; }
+    .swi-table-striped tbody tr:nth-child(even) { background: #fafafa; }
+    .swi-win { font-weight: 700; }
+    .swi-accordion {
+      border: 1px solid #e5e9ef;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      overflow: hidden;
+    }
+    .swi-accordion summary {
+      padding: 14px 18px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.97rem;
+      background: #f5f5f5;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #000;
+    }
+    .swi-accordion summary::before {
+      content: "▸";
+      transition: transform 0.2s;
+      font-size: 0.8rem;
+      color: #000;
+    }
+    .swi-accordion[open] summary::before { transform: rotate(90deg); }
+    .swi-accordion summary::-webkit-details-marker { display: none; }
+    .swi-accordion-body {
+      padding: 14px 18px;
+      font-size: 0.93rem;
+      line-height: 1.6;
+      border-top: 1px solid #e5e9ef;
+    }
+    .swi-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 1rem 0 2rem;
+    }
+    .swi-tag {
+      display: inline-block;
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      background: #f5f5f5;
+      color: #000;
+      border: 1px solid #ddd;
+    }
+    @media (max-width: 768px) {
+      .publication-title { font-size: 1.9rem; }
+      .swi-steps { flex-direction: column; }
+      .swi-step { flex-direction: column; text-align: center; }
+      .swi-step-number { margin-bottom: 0.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+<section class="hero" style="padding-top: 1rem;">
+  <div class="hero-body" style="padding-bottom: 0.5rem;">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+          <h1 class="title is-1 publication-title">
+            <span class="swi-gradient">What Everyone Missed</span>
+          </h1>
+          <div class="is-size-5" style="color: #666; margin-top: 0.6em;">
+            Cross-Paper Synthesis · 18 Papers · 2021–2026
+          </div>
+          <div class="is-size-6" style="color: #999; margin-top: 0.3em;">
+            Novel insights that emerge only from reading the full collection
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" style="padding-top: 0;">
+  <div class="container is-max-desktop">
+    <div class="content has-text-justified publication-body">
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">💡</div>
+        <div class="swi-callout-body">
+          <strong>What this is:</strong> Not a summary of 18 papers. This is what emerges when you read them all together and ask: what patterns are visible only at this altitude? What contradictions does no one resolve? What questions does the field not know to ask?
+        </div>
+      </div>
+
+      <!-- INSIGHT 1 -->
+      <h2 style="font-family: 'Google Sans', sans-serif; font-size: 1.85rem; font-weight: 700; margin-top: 2rem;">1. Alignment Is Two Different Problems</h2>
+
+      <p>Every paper in this collection uses the word "alignment" to mean something different. The field treats it as one problem. It isn't.</p>
+
+      <p><strong>Style alignment</strong> is what LIMA (Paper 08) demonstrates: teaching a pretrained model to respond in a helpful assistant format. Cost: ~1,000 curated examples. Mechanism: format matching on the surface distribution. The model's knowledge doesn't change — only its output behavior does.</p>
+
+      <p><strong>Reasoning alignment</strong> is what Qwen3 (Paper 17) and DeepSeekMath (Paper 14) demonstrate: teaching a model to think step-by-step, explore solution paths, and verify its own reasoning. Cost: multi-stage RL with GRPO, 64 samples per question, process supervision. Mechanism: actually modifying the model's internal computation to produce better reasoning chains.</p>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">⚡</div>
+        <div class="swi-callout-body">
+          <strong>The hidden distinction:</strong> LIMA's superficial alignment hypothesis says "alignment teaches format, not knowledge." This is true for <em>style</em> alignment. But Qwen3's 4-stage pipeline proves that <em>reasoning</em> alignment genuinely changes what the model can compute. These are fundamentally different processes with different cost profiles, and no paper in this collection explicitly distinguishes them.
+        </div>
+      </div>
+
+      <p>This explains an apparent contradiction: LIMA says alignment is cheap (1,000 examples). DeepSeekMath says alignment is expensive (GRPO, 64 samples, process rewards). Both are right — they're solving different problems. Style alignment is a surface-level format transfer. Reasoning alignment is a capability-building process that requires exploration, reward signals, and iterative improvement.</p>
+
+      <p><strong>Why this matters:</strong> When you run DPO in Unsloth, you're doing style alignment. When you run GRPO on math tasks, you're doing reasoning alignment. They feel similar in code but they're fundamentally different operations. The field's failure to distinguish them leads to confused claims about "alignment cost" and "alignment tax."</p>
+
+      <!-- INSIGHT 2 -->
+      <h2 style="font-family: 'Google Sans', sans-serif; font-size: 1.85rem; font-weight: 700; margin-top: 2.5rem;">2. Training Is Curriculum Design, Not Optimization</h2>
+
+      <p>Every paper that describes a successful training pipeline is actually describing a <em>curriculum</em> — a sequence of different optimization problems, each with different data, different objectives, and different dynamics.</p>
+
+      <div class="swi-steps">
+        <div class="swi-step">
+          <div class="swi-step-number">Φ1</div>
+          <div class="swi-step-content">
+            <h4>Phi-1: Textbook → Exercise</h4>
+            <p>Pretrain on filtered code (6B tokens), then finetune on exercises (180M tokens). The curriculum teaches <em>reading</em> before <em>writing</em>.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">S2</div>
+          <div class="swi-step-content">
+            <h4>SmolLM2: Rebalance mid-flight</h4>
+            <p>4 stages with manually rebalanced data mixtures. When math is weak, increase math proportion. When code improves, shift to long-context. The curriculum adapts to the student.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">Q3</div>
+          <div class="swi-step-content">
+            <h4>Qwen3: Cold start → RL → Fusion → RL</h4>
+            <p>Stage 1 teaches reasoning format. Stage 2 builds reasoning capability via GRPO. Stage 3 integrates thinking/non-thinking modes. Stage 4 broadens capabilities. Each stage has different data and a different objective.</p>
+          </div>
+        </div>
+      </div>
+
+      <p>The common thread: <strong>the optimal data at each training stage is different, and the optimal objective at each stage is different.</strong> This is not just "more training" — it's a carefully designed sequence where each stage prepares the model for the next.</p>
+
+      <div class="swi-pullquote">
+        <p>"No paper in this collection explicitly frames training as curriculum design. But every successful pipeline follows this pattern. The field talks about 'stages' and 'phases' without recognizing that they're implementing a pedagogical principle: teach the easy concepts first, then increase difficulty."</p>
+      </div>
+
+      <p><strong>The SFT-GRPO overlap finding (Paper 15) is a curriculum design failure:</strong> When you reuse SFT data for GRPO, you're asking the model to "explore" material it already knows. GRPO needs <em>novel</em> challenges — the next level of the curriculum, not repetition of the previous one. This is why 0% overlap works: it's curriculum progression, not just data hygiene.</p>
+
+      <!-- INSIGHT 3 -->
+      <h2 style="font-family: 'Google Sans', sans-serif; font-size: 1.85rem; font-weight: 700; margin-top: 2.5rem;">3. Knowledge Is Far More Compressible Than Parameters Imply</h2>
+
+      <p>The collective evidence across these papers suggests something profound about what pretraining actually learns:</p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>Paper</th><th>Finding</th><th>Implication</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>LoRA (06)</td><td>ΔW has rank 4–8</td><td>Task-specific updates are ~0.01% of weight space</td></tr>
+          <tr><td>TinyStories (02)</td><td>10M params = coherent stories</td><td>Core language ability fits in tiny models</td></tr>
+          <tr><td>Phi-1 (03)</td><td>7B tokens = SOTA code</td><td>Useful knowledge is ~100× more compressible than web scale</td></tr>
+          <tr><td>QLoRA (07)</td><td>4-bit quantization = no quality loss</td><td>Weights have massive redundancy</td></tr>
+          <tr><td>LIMA (08)</td><td>1,000 examples = alignment</td><td>Format knowledge is ~10,000× smaller than the model</td></tr>
+        </tbody>
+      </table>
+
+      <p>These five findings, read together, suggest that the <em>actual knowledge content</em> of language models is far lower-dimensional than the parameter count implies. Most parameters are <strong>scaffolding</strong> — they exist to make the knowledge accessible and composable, not to store the knowledge itself.</p>
+
+      <p>This is why LoRA works at rank 4. Why quantization to 4 bits loses almost nothing. Why 1,000 examples can align a 65B model. The knowledge is there, already learned during pretraining. Everything after pretraining is about <em>accessing</em> that knowledge correctly — not adding new knowledge.</p>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">🔬</div>
+        <div class="swi-callout-body">
+          <strong>The unasked question:</strong> If knowledge is this compressible, what are the remaining ~99% of parameters doing? The answer is probably "representation" — they encode the <em>structure</em> of knowledge (how concepts relate, how reasoning flows) rather than the content. But no paper in this collection tests this hypothesis directly.
+        </div>
+      </div>
+
+      <!-- INSIGHT 4 -->
+      <h2 style="font-family: 'Google Sans', sans-serif; font-size: 1.85rem; font-weight: 700; margin-top: 2.5rem;">4. The Evaluation Crisis Is the Real Bottleneck</h2>
+
+      <p>Nearly every paper in this collection relies on GPT-4 as an evaluation proxy. Paper 07 (QLoRA) explicitly measures the correlation: <strong>Kendall τ = 0.43</strong> between GPT-4 and human judgment. That's moderate at best.</p>
+
+      <p>Paper 13's most important finding — that parameterization choice (FFT vs LoRA) dominates objective choice (SFT vs DPO) by 12:1 — was only discovered because they ran careful ablations on both axes. Most papers don't. They compare methods under a single parameterization (usually LoRA), which means:</p>
+
+      <ul>
+        <li>Papers comparing DPO vs GRPO may be comparing LoRA-DPO vs LoRA-GRPO — both handicapped</li>
+        <li>Papers claiming "DPO adds marginal gains" (Paper 13) may be revealing LoRA's limitation, not DPO's</li>
+        <li>The field's benchmark leaderboard is comparing methods under conditions that may suppress their true potential</li>
+      </ul>
+
+      <div class="swi-pullquote">
+        <p>"The community is over-investing in alignment algorithms and under-investing in evaluation. Paper 13's 12:1 finding suggests that better evaluation infrastructure — which would reveal these parameterization effects — is more valuable than a new alignment method."</p>
+      </div>
+
+      <p>Every paper uses different benchmarks, different evaluation protocols, different GPT-4 prompts. TinyStories created GPT-Eval because existing benchmarks didn't work. ZEPHYR and others use MT-Bench/AlpacaEval with GPT-4 as judge. But GPT-4 has known biases — favoring verbose outputs, its own distilled models, and specific formatting patterns. The field lacks a stable evaluation foundation, and no single paper acknowledges this collectively.</p>
+
+      <!-- INSIGHT 5 -->
+      <h2 style="font-family: 'Google Sans', sans-serif; font-size: 1.85rem; font-weight: 700; margin-top: 2.5rem;">5. The Alignment Tax Paradox</h2>
+
+      <p>Every paper shows that alignment training degrades base model performance by 1–5% on academic benchmarks. This is called the "alignment tax." But LIMA (Paper 08) simultaneously proves that alignment is superficial — it only teaches format, not knowledge.</p>
+
+      <p><strong>Here's the paradox nobody resolves:</strong> If alignment is superficial (only format matching), why does it degrade factual knowledge?</p>
+
+      <p>The answer, implied but never stated, is that the format-matching process <em>overwrites some weights that were storing knowledge</em>. When you fine-tune on 1,000 assistant-style responses, you're not just teaching the model to say "Sure, I can help with that!" — you're also shifting the weight landscape in ways that slightly degrade factual recall. The 1,000 examples are a lossy compression of the desired output distribution, and that compression inevitably corrupts some of the pretraining signal.</p>
+
+      <p>This explains why ZEPHYR (Paper 11) shows DPO overfitting is benign — DPO doesn't change the model's knowledge, it just reweights existing outputs. But SFT overfitting (Paper 13) is harmful — SFT actually moves weights. The difference: DPO operates on the output distribution, SFT operates on the weight space.</p>
+
+      <!-- INSIGHT 6 -->
+      <h2 style="font-family: 'Google Sans', sans-serif; font-size: 1.85rem; font-weight: 700; margin-top: 2.5rem;">6. The Hardware-Software Co-Evolution</h2>
+
+      <p>Three papers reveal a pattern the field doesn't discuss: <strong>the "optimal" model is not the best-performing one — it's the best-performing one that fits in your hardware.</strong></p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>Paper</th><th>Constraint</th><th>Result</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>QLoRA (07)</td><td>Single 48GB GPU</td><td>65B model fine-tunable → Guanaco 65B = 99.3% ChatGPT</td></tr>
+          <tr><td>Phi-3 (16)</td><td>iPhone RAM</td><td>3.8B + INT4 = 1.8GB → runs offline at >12 tok/s</td></tr>
+          <tr><td>Unsloth (18)</td><td>Consumer GPU VRAM</td><td>7B DPO fits on T4 (16GB) with gradient checkpointing</td></tr>
+        </tbody>
+      </table>
+
+      <p>The practical frontier is defined by hardware constraints, not theoretical optima. QLora exists because people need to fine-tune 65B models on consumer hardware. Unsloth exists because people need DPO training to fit in 16GB. Phi-3 exists because people want LLMs on phones.</p>
+
+      <p>This creates a feedback loop: hardware constraints shape research directions (quantization, PEFT, distillation), which shape which models get built, which shape which applications are possible. The papers document the results of this loop without acknowledging it as a system.</p>
+
+      <!-- INSIGHT 7 -->
+      <h2 style="font-family: 'Google Sans', sans-serif; font-size: 1.85rem; font-weight: 700; margin-top: 2.5rem;">7. The Human Annotation Extinction</h2>
+
+      <p>Read these papers in chronological order and watch human annotation disappear:</p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>Date</th><th>Paper</th><th>Human Data</th><th>Replacement</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Jun 2021</td><td>LoRA</td><td>Task-specific datasets</td><td>—</td></tr>
+          <tr><td>Dec 2022</td><td>SELF-INSTRUCT</td><td>175 seed tasks</td><td>Model generates the rest</td></tr>
+          <tr><td>May 2023</td><td>LIMA</td><td>1,000 curated examples</td><td>Minimal, high-quality</td></tr>
+          <tr><td>May 2023</td><td>DPO</td><td>Human preference pairs</td><td>—</td></tr>
+          <tr><td>Oct 2023</td><td>ZEPHYR</td><td>Zero</td><td>GPT-4 scores model outputs</td></tr>
+          <tr><td>Mar 2024</td><td>ORPO</td><td>AI preference pairs</td><td>Monolithic, no humans</td></tr>
+          <tr><td>May 2025</td><td>Qwen3</td><td>Teacher distillation</td><td>Strong-to-weak transfer</td></tr>
+        </tbody>
+      </table>
+
+      <p>The trajectory is clear: human annotation is being systematically eliminated. SELF-INSTRUCT bootstraps from 175 examples. ZEPHYR uses AI feedback. Qwen3 distills from a larger model. The end state: <strong>a large model teaches a small model, which teaches an even smaller model, with no human in the loop.</strong></p>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">⚠️</div>
+        <div class="swi-callout-body">
+          <strong>The ceiling question nobody asks:</strong> If alignment is entirely AI-generated (ZEPHYR), and the AI judge is GPT-4, and the training data is bootstrapped (SELF-INSTRUCT), then the quality ceiling is bounded by the teacher model's capabilities. The student can never exceed the teacher. This creates a fundamental limit on self-improvement that no paper acknowledges.
+        </div>
+      </div>
+
+      <!-- INSIGHT 8 -->
+      <h2 style="font-family: 'Google Sans', sans-serif; font-size: 1.85rem; font-weight: 700; margin-top: 2.5rem;">8. The Implicit 2026 Training Recipe</h2>
+
+      <p>No single paper states the complete optimal training pipeline. But reading all 18 together, the implicit recipe for 2026 emerges:</p>
+
+      <div class="swi-steps">
+        <div class="swi-step">
+          <div class="swi-step-number">1</div>
+          <div class="swi-step-content">
+            <h4>Pretrain on curated data</h4>
+            <p>Follow Phi-1/SmolLM2: filter web data for educational value, supplement with synthetic textbooks. Multi-stage rebalancing (SmolLM2 approach). Code training improves math (DeepSeekMath).</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">2</div>
+          <div class="swi-step-content">
+            <h4>SFT on 1K–50K curated demonstrations</h4>
+            <p>Follow LIMA/ZEPHYR: high quality, diverse, uniform style. Style consistency matters more than quantity. Include 13+ safety examples.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">3</div>
+          <div class="swi-step-content">
+            <h4>Preference optimization</h4>
+            <p>For verifiable tasks (math, code): GRPO with process supervision, disjoint data from SFT. For subjective tasks (dialogue, writing): DPO with β=0.1. For simplicity: ORPO in one stage.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="swi-steps" style="margin-top: 0;">
+        <div class="swi-step">
+          <div class="swi-step-number">4</div>
+          <div class="swi-step-content">
+            <h4>Distill to smaller models</h4>
+            <p>Follow Qwen3: strong-to-weak distillation (~10× efficiency). Train a large flagship, distill reasoning to smaller models via on-policy logit alignment.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">5</div>
+          <div class="swi-step-content">
+            <h4>Deploy with INT4 quantization</h4>
+            <p>Follow QLoRA: NF4 + double quantization. LoRA on ALL layers. Paged optimizers for long sequences. Consumer hardware deployment.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">6</div>
+          <div class="swi-step-content">
+            <h4>Evaluate honestly</h4>
+            <p>Follow Paper 13: test across parameterizations (FFT AND LoRA). Use multiple evaluators. Acknowledge GPT-4's τ=0.43 limitation.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- INSIGHT 9 -->
+      <h2 style="font-family: 'Google Sans', sans-serif; font-size: 1.85rem; font-weight: 700; margin-top: 2.5rem;">9. The Five Contradictions Nobody Resolves</h2>
+
+      <details class="swi-accordion">
+        <summary>1. LoRA adapter placement: attention-only vs all-layers</summary>
+        <div class="swi-accordion-body">
+          Paper 06 (LoRA) recommends W_q + W_v for attention-only adaptation. Paper 07 (QLoRA) directly contradicts this: <strong>ALL layers including MLP must be adapted under quantization.</strong> The quantization noise in base weights means adapters need to compensate model-wide. Practitioners using Unsloth (Paper 18) follow QLoRA's recommendation (7 target modules), not LoRA's. The contradiction is resolved in practice but never explained in theory.
+        </div>
+      </details>
+
+      <details class="swi-accordion">
+        <summary>2. DPO value: 61% win rate vs "marginal 0.18 points"</summary>
+        <div class="swi-accordion-body">
+          Paper 10 (DPO) shows strong gains over PPO (61% vs 57% win rate). Paper 11 (ZEPHYR) shows DPO adds value over SFT-only (7.34 vs 7.00 MT-Bench). But Paper 13 finds DPO adds only 0.18 F1 points. The reconciliation: DPO's value depends on <em>parameterization</em>. With FFT, DPO helps more. With LoRA, DPO is handicapped. The 12:1 ratio (parameterization vs objective) means comparing DPO papers without controlling for FFT/LoRA is comparing apples to oranges.
+        </div>
+      </details>
+
+      <details class="swi-accordion">
+        <summary>3. SFT data: 1,000 examples enough vs 11-point drop from reduction</summary>
+        <div class="swi-accordion-body">
+          Paper 08 (LIMA) says 1,000 hand-curated examples suffice. Paper 13 shows reducing data from 283K to 2.83K drops F1 by 11 points. The reconciliation: <strong>quality-adjusted count matters, not raw count.</strong> LIMA's 1,000 are hand-selected for diversity, quality, and style consistency. Paper 13's 2.83K are a random subset. The key variable is not "how many" but "how many high-quality, diverse examples."
+        </div>
+      </details>
+
+      <details class="swi-accordion">
+        <summary>4. Reference model: required → eliminated → shared</summary>
+        <div class="swi-accordion-body">
+          DPO (Paper 10) requires a frozen reference model. ORPO (Paper 12) eliminates it. Unsloth (Paper 18) shows ref_model=None with LoRA achieves the same memory savings. These aren't contradictory — they represent an evolutionary simplification. But the theoretical question remains: why does sharing the base model as reference work? Because LoRA initializes the adapter at zero, so the initial policy IS the reference. As training progresses, they diverge, but the KL constraint is still implicit in the LoRA initialization.
+        </div>
+      </details>
+
+      <details class="swi-accordion">
+        <summary>5. Online vs offline: GRPO strictly dominates DPO for verifiable tasks</summary>
+        <div class="swi-accordion-body">
+          DeepSeekMath (Paper 14) shows GRPO (online) > DPO (offline) for math reasoning. Paper 15 reinforces this: RL needs fresh exploration, not replayed SFT data. The reconciliation: for <em>verifiable</em> tasks (math, code, logic), online RL is strictly superior because it explores the model's own output distribution. For <em>subjective</em> tasks (dialogue, writing), DPO may still be the right choice because there's no objective correctness signal to explore against.
+        </div>
+      </details>
+
+      <!-- CLOSING -->
+      <h2 style="font-family: 'Google Sans', sans-serif; font-size: 1.85rem; font-weight: 700; margin-top: 2.5rem;">What This Means for You</h2>
+
+      <p>You have practical Unsloth/SFT/DPO experience. These 9 insights reshape how you should think about your training work:</p>
+
+      <ul>
+        <li><strong>You're doing style alignment, not reasoning alignment.</strong> When you run DPO in Unsloth, you're teaching format — not new capabilities. For reasoning, you'd need GRPO with verifiable rewards (Paper 14).</li>
+        <li><strong>Your training pipeline is a curriculum.</strong> Each stage should use different data with a different objective. Don't reuse SFT data for GRPO (Paper 15). Don't skip SFT before DPO (Paper 11).</li>
+        <li><strong>Your data quality matters more than your algorithm.</strong> If you upgrade your SFT dataset from "okay" to "excellent," you'll see more improvement than switching from DPO to GRPO (Paper 13's 12:1 finding).</li>
+        <li><strong>LoRA is masking what your alignment methods can really do.</strong> If you have the VRAM, try full fine-tuning. The parameterization gap is 12× larger than the objective gap (Paper 13).</li>
+      </ul>
+
+      <div class="swi-tags">
+        <span class="swi-tag">Cross-Paper Synthesis</span>
+        <span class="swi-tag">18 Papers</span>
+        <span class="swi-tag">Novel Insights</span>
+        <span class="swi-tag">2021–2026</span>
+        <span class="swi-tag">Alignment Theory</span>
+        <span class="swi-tag">Training Curriculum</span>
+        <span class="swi-tag">Evaluation Crisis</span>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+</body>
+</html>
