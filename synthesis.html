@@ -481,26 +481,240 @@
         </div>
       </details>
 
+      <!-- NEW INSIGHT 10: Distribution-Shaping Unification -->
+      <h2 style="font-family: 'Google Sans', sans-serif; font-size: 1.85rem; font-weight: 700; margin-top: 3rem;">10. All Post-Training Is Distribution Shaping, Not Knowledge Addition</h2>
+
+      <p>This is the single biggest insight that emerges from reading all 18 papers together — and no author, in any paper, states it explicitly:</p>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">🎯</div>
+        <div class="swi-callout-body">
+          <strong>The hidden consensus:</strong> LoRA learns weight deltas <em>orthogonal</em> to pretrained directions (Paper 06). DeepSeekMath's GRPO improves Maj@K but not Pass@K — the solutions already existed, they just weren't consistently chosen (Paper 14). DPO reweights log-ratios of <em>existing</em> outputs (Paper 10). Qwen3's Cold Start teaches <em>exhibition</em> of reasoning the model already possesses, not new reasoning ability (Paper 17). LIMA's 1,000 examples unlock assistant behavior already latent in the weights (Paper 08).
+        </div>
+      </div>
+
+      <p><strong>Every post-training method — SFT, DPO, GRPO, ORPO, distillation — is fundamentally the same operation:</strong> take the pretrained probability distribution, apply some constraint or reward signal, and concentrate probability mass on desired regions. Knowledge is almost never added. It's surfaced.</p>
+
+      <p>This reframes Insight #1 (alignment is two problems). Style alignment shapes the surface output distribution. Reasoning alignment shapes the internal computation trace distribution. Both are distribution-shaping at different levels of abstraction. Neither adds fundamentally new knowledge. The pretrained model already "knows" everything it will ever know — post-training just makes that knowledge accessible in the right way.</p>
+
+      <div class="swi-pullquote">
+        <p>"Pretraining encodes capabilities as latent potential. All post-training makes them accessible. The distinction between 'adding capability' and 'surfacing capability' is the organizing principle of the entire field — and no paper names it."</p>
+      </div>
+
+      <!-- NEW INSIGHT 11: Small Model Failure Signatures -->
+      <h2 style="font-family: 'Google Sans', sans-serif; font-size: 1.85rem; font-weight: 700; margin-top: 2.5rem;">11. Small Models Have Qualitatively Different Failure Modes, Not Just Quantitative Weakness</h2>
+
+      <p>Across these papers, small models (<7B) exhibit failure signatures that are structurally different from large models — not just weaker versions of the same behavior:</p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>Failure</th><th>Paper</th><th>Why It's Structural</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Cannot count</td><td>Phi-1 (03)</td><td>Transformer architecture limitation, not a data problem — no amount of data fixes it</td></tr>
+          <tr><td>Math ceiling at ~32% GSM8K</td><td>SmolLM2 (04)</td><td>1.7B model simply cannot fit mathematical reasoning patterns</td></tr>
+          <tr><td>Hallucination susceptibility</td><td>Phi-3 (16)</td><td>Not just less factual knowledge — actively produces confident falsehoods at higher rates</td></tr>
+          <tr><td>RL exploration failure</td><td>Qwen3 (17)</td><td>Small models <em>need</em> distillation because they can't explore effectively through RL</td></tr>
+          <tr><td>Overfitting SFT patterns</td><td>SFT-GRPO (15)</td><td>Small models latch onto training patterns harder, preventing RL from introducing novelty</td></tr>
+        </tbody>
+      </table>
+
+      <p><strong>This means you can't just scale down a training recipe.</strong> Small models need qualitatively different approaches — distillation instead of RL, more aggressive data curation, and explicit safety alignment (Phi-3's DPO-based RAI). The synthesis's 2026 recipe (Insight #9) should bifurcate at a threshold (~3B params): above it, GRPO with exploration; below it, distillation from a larger model.</p>
+
+      <!-- NEW INSIGHT 12: Incompatible Frameworks -->
+      <h2 style="font-family: 'Google Sans', sans-serif; font-size: 1.85rem; font-weight: 700; margin-top: 2.5rem;">12. DPO and GRPO Are Mathematically Incommensurable</h2>
+
+      <p>The field uses two families of alignment methods that rest on fundamentally incompatible axioms — and no paper acknowledges this:</p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>Property</th><th>DPO Family (Papers 10–13)</th><th>GRPO Family (Papers 14–15, 17)</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Foundation</td><td>Bradley-Terry preference model</td><td>Group-relative advantage estimation</td></tr>
+          <tr><td>Axiom</td><td>Preferences are transitive comparisons</td><td>Rewards have cardinal values normalizable within groups</td></tr>
+          <tr><td>Data</td><td>Offline preference pairs (y_w, y_l)</td><td>Online sampled outputs with rule-based rewards</td></tr>
+          <tr><td>Reference model</td><td>Required (in theory)</td><td>No value function, but needs old policy checkpoint</td></tr>
+          <tr><td>What "better" means</td><td>Pairwise: A > B</td><td>Cardinal: A = 0.7, B = 0.3</td></tr>
+        </tbody>
+      </table>
+
+      <p>DPO assumes preferences are comparative (A is better than B). GRPO assumes rewards are evaluative (A scores 0.7/1.0). These are different philosophical frameworks for what "alignment" means. DPO's equivalence class theorem (Paper 10) proves that only relative differences between rewards matter — absolute values are meaningless. GRPO's reward function must provide meaningful absolute scores to compute group-relative advantages.</p>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">🧩</div>
+        <div class="swi-callout-body">
+          <strong>The practical consequence:</strong> You can't directly compare DPO papers to GRPO papers. They're optimizing for different definitions of "better." When a paper reports "DPO underperforms GRPO on math," it's not measuring algorithm quality — it's measuring which type of data (pairwise preferences vs cardinal rewards) is more informative for that task.
+        </div>
+      </div>
+
+      <!-- NEW INSIGHT 13: Compute Reallocation -->
+      <h2 style="font-family: 'Google Sans', sans-serif; font-size: 1.85rem; font-weight: 700; margin-top: 2.5rem;">13. No Technique Actually Reduces Total Compute — They Shift It</h2>
+
+      <p>Every "efficiency" innovation in these papers reallocates compute from one resource to another, rather than reducing total work:</p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>Technique</th><th>Reduces</th><th>Adds</th><th>Net Effect</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>QLoRA</td><td>GPU memory (16-bit → 4-bit)</td><td>Dequantization compute overhead</td><td>Memory/compute tradeoff</td></tr>
+          <tr><td>GRPO</td><td>Value function memory</td><td>G× more forward passes (G=64)</td><td>Critic memory → sampling compute</td></tr>
+          <tr><td>LoRA</td><td>Trainable parameters (10,000×)</td><td>Base model processes every token</td><td>Trainable → frozen compute</td></tr>
+          <tr><td>Blocksparse attention</td><td>KV cache O(n²) → O(n×block)</td><td>Pattern computation overhead</td><td>Memory → compute tradeoff</td></tr>
+          <tr><td>Distillation</td><td>Student training compute</td><td>Teacher training + inference</td><td>Shifted from student to teacher</td></tr>
+        </tbody>
+      </table>
+
+      <p>The synthesis's "hardware-software co-evolution" (Insight #6) frames these as efficiency gains. They're not — they're <strong>compute reallocation strategies</strong>, each appropriate for a different hardware bottleneck. The choice of technique depends on whether you're memory-bound, compute-bound, or sampling-bound.</p>
+
+      <!-- NEW INSIGHT 14: Teacher Ceiling -->
+      <h2 style="font-family: 'Google Sans', sans-serif; font-size: 1.85rem; font-weight: 700; margin-top: 2.5rem;">14. The Teacher Model Quality Ceiling Is Unavoidable</h2>
+
+      <p>Every paper that uses a teacher model or AI judge creates an unbreakable quality ceiling. Read these five findings together:</p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>Paper</th><th>Teacher/Judge</th><th>Ceiling Created</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Phi-1 (03)</td><td>GPT-4 classifier for code quality</td><td>Training data cannot exceed GPT-4's judgment of "educational value"</td></tr>
+          <tr><td>Phi-3 (16)</td><td>GPT-4 for synthetic data generation</td><td>Synthetic textbooks bounded by GPT-4's teaching ability</td></tr>
+          <tr><td>ZEPHYR (11)</td><td>GPT-4 as preference judge</td><td>Alignment cannot exceed GPT-4's preferences</td></tr>
+          <tr><td>Qwen3 (17)</td><td>235B teacher model</td><td>Student cannot exceed teacher on reasoning tasks</td></tr>
+          <tr><td>QLoRA (07)</td><td>GPT-4 as evaluation proxy (τ=0.43)</td><td>Measurement accuracy bounded by moderate correlation with humans</td></tr>
+        </tbody>
+      </table>
+
+      <p>The "human annotation extinction" (Insight #7) isn't just replacing humans — it's replacing them with a proxy that has its own ceiling. GPT-4 judging GPT-4 distillation produces a feedback loop: the teacher's quality bounds the student, and the judge's quality bounds assessment of both. The self-improvement dream (models training better models recursively) has no empirical support in this collection.</p>
+
+      <div class="swi-pullquote">
+        <p>"The student can never exceed the teacher. If the teacher is GPT-4, and GPT-4's evaluation of itself has τ=0.43 with human judgment, then every AI-aligned model in this collection has a quality ceiling set by a noisy, self-referential proxy."</p>
+      </div>
+
+      <!-- NEW INSIGHT 15: Negative Data -->
+      <h2 style="font-family: 'Google Sans', sans-serif; font-size: 1.85rem; font-weight: 700; margin-top: 2.5rem;">15. The Negative Data Blind Spot — What You Exclude Matters as Much as What You Include</h2>
+
+      <p>The field optimizes for data inclusion. But five papers accidentally discover that exclusion is equally important:</p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>Paper</th><th>Excluded</th><th>Why It Mattered</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Phi-1 (03)</td><td>40% of CodeExercises (contamination)</td><td>Removal only dropped performance marginally — data was redundant</td></tr>
+          <tr><td>SFT-GRPO (15)</td><td>All SFT data from GRPO stage</td><td>Exclusion <em>improved</em> performance by +10.4pp</td></tr>
+          <tr><td>SmolLM2 (04)</td><td>OWM math (little impact)</td><td>Excluding low-quality data prevented dilution</td></tr>
+          <tr><td>Phi-3 (16)</td><td>Negative safety examples in SFT</td><td>Explicit refusal training required exclusion-based DPO</td></tr>
+          <tr><td>SELF-INSTRUCT (09)</td><td>Instructions by ROUGE-L > 0.7</td><td>Excluding similar instructions was essential for diversity</td></tr>
+        </tbody>
+      </table>
+
+      <p><strong>No paper systematically studies "toxic training data" — data that actively degrades performance when included.</strong> The SFT-GRPO overlap paper discovers this accidentally: identical data in two stages is harmful. But the implication is broader: some data in any stage may be net-negative. The field has no theory of training data toxicity.</p>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">⛔</div>
+        <div class="swi-callout-body">
+          <strong>Practical implication:</strong> When curating SFT data for Unsloth, removing bad examples is more impactful than adding good ones. The SFT-GRPO overlap finding generalizes: any data that's too similar to what the model already knows, too noisy to learn from, or too divergent from your target style may be net-negative. Curate by exclusion, not just selection.
+        </div>
+      </div>
+
+      <!-- NEW INSIGHT 16: Context Extension Convergence -->
+      <h2 style="font-family: 'Google Sans', sans-serif; font-size: 1.85rem; font-weight: 700; margin-top: 2.5rem;">16. Context Extension: Three Papers, Three Solutions, Zero Comparisons</h2>
+
+      <p>Three papers independently solve the same problem — extending context beyond training length — with three different methods:</p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>Paper</th><th>Method</th><th>Approach</th><th>Context Achieved</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Phi-3 (16)</td><td>LongRope</td><td>Per-head, per-frequency positional scaling — different attention heads get different RoPE frequencies because they specialize in different dependency ranges</td><td>4K → 128K</td></tr>
+          <tr><td>Qwen3 (17)</td><td>ABF + YARN</td><td>ABF: Adopt Base Frequency (increase RoPE base to 1M). YARN: interpolation with attention scaling for extreme positions</td><td>32K → 128K</td></tr>
+          <tr><td>SmolLM2 (04)</td><td>RoPE frequency scaling</td><td>Simple frequency rescaling during long-context fine-tuning</td><td>2K → 8K</td></tr>
+        </tbody>
+      </table>
+
+      <p><strong>Nobody has compared these head-to-head.</strong> Each paper uses a different method, a different base model, and different evaluation. The field has no consensus on the "right" way to extend context — just three independently validated approaches that all seem to work. This is a symptom of the evaluation crisis (Insight #4): without standardized long-context benchmarks, everyone picks a method and reports it works.</p>
+
+      <!-- OPEN QUESTIONS -->
+      <h2 style="font-family: 'Google Sans', sans-serif; font-size: 1.85rem; font-weight: 700; margin-top: 3rem;">17. Seven Questions the Field Should Be Asking</h2>
+
+      <details class="swi-accordion">
+        <summary>1. What is the information-theoretic lower bound on training data for a given capability?</summary>
+        <div class="swi-accordion-body">
+          Phi-1 achieved code SOTA with only 7B tokens. LoRA works at rank 4. LIMA aligns with 1,000 examples. All suggest extreme compressibility of "useful" training signal. But no paper formalizes the minimum. Is there a Shannon limit for knowledge transfer to language models?
+        </div>
+      </details>
+
+      <details class="swi-accordion">
+        <summary>2. Why is code→math transfer asymmetric?</summary>
+        <div class="swi-accordion-body">
+          DeepSeekMath shows code pretraining improves math reasoning significantly. But does math pretraining improve code? No paper tests the reverse direction. If the transfer is one-way, it reveals something about the structure of reasoning itself — perhaps that procedural knowledge (code) scaffolds declarative reasoning (math), but not vice-versa.
+        </div>
+      </details>
+
+      <details class="swi-accordion">
+        <summary>3. At what model size does online RL become net beneficial?</summary>
+        <div class="swi-accordion-body">
+          GRPO's G=64 sampling is expensive. For models under ~3B, it may cost more compute than it's worth — especially given small models' exploration difficulties (Insight #11). No paper defines the crossover point where online RL's benefits exceed its sampling overhead.
+        </div>
+      </details>
+
+      <details class="swi-accordion">
+        <summary>4. Can we factor models into "knowledge" and "scaffolding" components?</summary>
+        <div class="swi-accordion-body">
+          Insight #3 suggests most parameters are scaffolding — they encode how knowledge is accessed, not the knowledge itself. If true, could we deploy just the knowledge component at dramatically smaller sizes? LoRA's finding that ΔW is orthogonal to W₀'s top singular directions suggests the structure is factorable. No paper attempts this factorization.
+        </div>
+      </details>
+
+      <details class="swi-accordion">
+        <summary>5. What is the optimal synthetic-to-real data ratio, and why does it cluster around 40%?</summary>
+        <div class="swi-accordion-body">
+          Phi-1 found ~42% synthetic data optimal. Qwen3 and SmolLM2 use synthetic data extensively but don't report the ratio. The recurring 30–45% range suggests a fundamental information-theoretic sweet spot — enough structure from real data, enough coverage from synthetic. No paper tests different ratios systematically or provides a theory for why this range works.
+        </div>
+      </details>
+
+      <details class="swi-accordion">
+        <summary>6. Is the SFT-GRPO overlap penalty about memorization, or something deeper?</summary>
+        <div class="swi-accordion-body">
+          Paper 15 hypothesizes "reward saturation" — the model already memorized SFT solutions, so GRPO adds nothing. But it could also be about optimization dynamics: reusing data changes the loss landscape at the SFT-trained checkpoint in ways that actively impede RL. The theoretical mechanism remains unexplored.
+        </div>
+      </details>
+
+      <details class="swi-accordion">
+        <summary>7. What defines "done" for LLM training?</summary>
+        <div class="swi-accordion-body">
+          Every paper trains until budget runs out, not until the model converges. No paper defines a principled stopping criterion. Phis stopped when performance plateaued. SmolLM2 stopped after fixed token counts. Qwen3 stopped after fixed stages. If training is curriculum design (Insight #2), each stage should have a defined exit condition — but nobody has one.
+        </div>
+      </details>
+
       <!-- CLOSING -->
       <h2 style="font-family: 'Google Sans', sans-serif; font-size: 1.85rem; font-weight: 700; margin-top: 2.5rem;">What This Means for You</h2>
 
-      <p>You have practical Unsloth/SFT/DPO experience. These 9 insights reshape how you should think about your training work:</p>
+      <p>You have practical Unsloth/SFT/DPO experience. These 17 insights reshape how you should think about your training work:</p>
 
       <ul>
-        <li><strong>You're doing style alignment, not reasoning alignment.</strong> When you run DPO in Unsloth, you're teaching format — not new capabilities. For reasoning, you'd need GRPO with verifiable rewards (Paper 14).</li>
-        <li><strong>Your training pipeline is a curriculum.</strong> Each stage should use different data with a different objective. Don't reuse SFT data for GRPO (Paper 15). Don't skip SFT before DPO (Paper 11).</li>
-        <li><strong>Your data quality matters more than your algorithm.</strong> If you upgrade your SFT dataset from "okay" to "excellent," you'll see more improvement than switching from DPO to GRPO (Paper 13's 12:1 finding).</li>
-        <li><strong>LoRA is masking what your alignment methods can really do.</strong> If you have the VRAM, try full fine-tuning. The parameterization gap is 12× larger than the objective gap (Paper 13).</li>
+        <li><strong>All your post-training is distribution shaping.</strong> When you run DPO in Unsloth, you're not teaching new knowledge — you're concentrating probability mass on preferred outputs. The model already "knows" what you want; you're just making it more likely to surface it.</li>
+        <li><strong>Your data quality matters more than your algorithm.</strong> If you upgrade your SFT dataset from "okay" to "excellent," you'll see more improvement than switching from DPO to GRPO. Parameterization choice (FFT vs LoRA) matters 12× more than objective choice (Paper 13).</li>
+        <li><strong>What you exclude matters as much as what you include.</strong> The SFT-GRPO overlap finding (Paper 15) generalizes: bad training data is net-negative. Curate by exclusion first — remove noise, repetition, and style inconsistency — then add volume.</li>
+        <li><strong>Small models need different strategies than large ones.</strong> Below ~3B params, distillation beats online RL. Small models overfit SFT patterns and can't explore effectively through GRPO. Use Qwen3's strong-to-weak distillation pattern.</li>
+        <li><strong>Your evaluation is probably lying to you.</strong> GPT-4 as judge has τ=0.43 with human judgment. Every alignment comparison you see in papers may be measuring noise. Test across parameterizations. Don't trust single-number benchmarks.</li>
+        <li><strong>LoRA is masking your methods' potential.</strong> If you have the VRAM, try full fine-tuning. The 12:1 parameterization gap means every LoRA-based comparison understates what the alignment algorithm can achieve.</li>
+        <li><strong>Don't reuse SFT data for GRPO.</strong> The reward saturation penalty is real and large (+10.4pp). Partition your data pools. GRPO needs novel prompts the model hasn't seen.</li>
+        <li><strong>You're bounded by your teacher.</strong> If you distill from GPT-4, your model will never exceed GPT-4. If you use GPT-4 to judge preferences, your alignment is bounded by GPT-4's preferences. There is no demonstrated path to super-LLM through AI feedback alone.</li>
       </ul>
 
       <div class="swi-tags">
         <span class="swi-tag">Cross-Paper Synthesis</span>
         <span class="swi-tag">18 Papers</span>
-        <span class="swi-tag">Novel Insights</span>
+        <span class="swi-tag">17 Insights</span>
         <span class="swi-tag">2021–2026</span>
+        <span class="swi-tag">Distribution Shaping</span>
         <span class="swi-tag">Alignment Theory</span>
         <span class="swi-tag">Training Curriculum</span>
         <span class="swi-tag">Evaluation Crisis</span>
+        <span class="swi-tag">7 Open Questions</span>
       </div>
 
     </div>
