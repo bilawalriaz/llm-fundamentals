@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LLM Fundamentals — Reading List</title>
+  <meta name="description" content="18 papers covering how LLMs work, from transformers to GRPO. Structured for practitioners with Unsloth/SFT/DPO experience.">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Noto+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --swi-ink: #000000;
+      --swi-muted: #666;
+      --swi-tldr-bg: #f5f5f5;
+    }
+    body {
+      font-family: 'Noto Sans', sans-serif;
+      color: #000;
+      background: #ffffff;
+    }
+    .swi-gradient {
+      background: linear-gradient(90deg, #d4380d, #fa541c, #fa8c16);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-weight: bold;
+    }
+    .publication-title {
+      font-family: 'Google Sans', sans-serif;
+      font-size: 2.6rem;
+      line-height: 1.15;
+      letter-spacing: -0.01em;
+      font-weight: 700;
+    }
+    .tier-header {
+      font-family: 'Google Sans', sans-serif;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #000;
+      margin-top: 2.5rem;
+      margin-bottom: 0.5rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid #000;
+    }
+    .tier-desc {
+      color: #666;
+      font-size: 0.95rem;
+      margin-bottom: 1.2rem;
+    }
+    .paper-card {
+      display: block;
+      padding: 18px 22px;
+      background: #f5f5f5;
+      border-radius: 10px;
+      text-decoration: none;
+      border: 1px solid transparent;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      margin-bottom: 12px;
+    }
+    .paper-card:hover {
+      border-color: #000;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    }
+    .paper-num {
+      font-family: 'Google Sans', sans-serif;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #888;
+      font-weight: 600;
+    }
+    .paper-card h3 {
+      margin: 4px 0 0;
+      font-size: 1.05rem;
+      color: #000;
+      line-height: 1.4;
+      font-weight: 600;
+      font-family: 'Google Sans', sans-serif;
+    }
+    .paper-card .paper-meta {
+      font-size: 0.85rem;
+      color: #666;
+      margin-top: 4px;
+    }
+    .paper-card .paper-tagline {
+      font-size: 0.9rem;
+      color: #333;
+      margin-top: 6px;
+      line-height: 1.5;
+    }
+    .swi-callout {
+      display: flex;
+      gap: 14px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin: 1.5rem 0;
+    }
+    .swi-callout-icon { font-size: 1.4rem; flex-shrink: 0; }
+    .swi-callout-body { font-size: 0.97rem; line-height: 1.6; }
+    .swi-pullquote {
+      margin: 2rem 0;
+      padding: 16px 24px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      font-style: italic;
+      font-size: 1.05rem;
+      line-height: 1.65;
+      color: #333;
+    }
+    .paper-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    @media (max-width: 768px) {
+      .publication-title { font-size: 1.9rem; }
+      .paper-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<section class="hero" style="padding-top: 1rem;">
+  <div class="hero-body" style="padding-bottom: 0.5rem;">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+          <h1 class="title is-1 publication-title">
+            <span class="swi-gradient">LLM Fundamentals</span>
+          </h1>
+          <div class="is-size-5" style="color: #666; margin-top: 0.4em;">
+            18 papers · From Attention to GRPO
+          </div>
+          <div class="is-size-6" style="color: #999; margin-top: 0.3em;">
+            Structured for practitioners with Unsloth / SFT / DPO experience
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" style="padding-top: 0;">
+  <div class="container is-max-desktop">
+
+    <div class="swi-callout">
+      <div class="swi-callout-icon">📖</div>
+      <div class="swi-callout-body">
+        <strong>How to use this:</strong> Each page is a self-contained analysis of one paper. No content is duplicated across pages — if a concept appears in multiple papers, it's explained fully in the paper that introduced it and cross-referenced elsewhere. Start with Tier 1 for foundations, or jump to whichever topic fills your biggest gap.
+      </div>
+    </div>
+
+    <!-- TIER 1 -->
+    <div class="tier-header">Tier 1: Foundations</div>
+    <div class="tier-desc">How transformers work, why data quality dominates, and what instruction tuning actually does.</div>
+
+    <div class="paper-grid">
+      <a class="paper-card" href="01-illustrated-transformer.html">
+        <div class="paper-num">01</div>
+        <h3>The Illustrated Transformer</h3>
+        <div class="paper-meta">Jay Alammar · 2018 (Updated 2025)</div>
+        <div class="paper-tagline">Visual intro to self-attention, Q/K/V, multi-head attention, positional encoding, encoder-decoder. The foundation everything else builds on.</div>
+      </a>
+      <a class="paper-card" href="02-tinystories.html">
+        <div class="paper-num">02</div>
+        <h3>TinyStories</h3>
+        <div class="paper-meta">Eldan & Li · arXiv:2305.07759 · May 2023</div>
+        <div class="paper-tagline">How small can LMs be? &lt;10M param models generating coherent text. Capability emergence: grammar → consistency → creativity.</div>
+      </a>
+      <a class="paper-card" href="03-phi-1-textbooks.html">
+        <div class="paper-num">03</div>
+        <h3>Textbooks Are All You Need (Phi-1)</h3>
+        <div class="paper-meta">Gunasekar et al. · arXiv:2306.11644 · Jun 2023</div>
+        <div class="paper-tagline">1.3B model beats 15.5B on code. 7B tokens of textbook-quality data > 1T tokens of web noise.</div>
+      </a>
+      <a class="paper-card" href="04-smollm2.html">
+        <div class="paper-num">04</div>
+        <h3>SmolLM2</h3>
+        <div class="paper-meta">HuggingFace · arXiv:2502.02737 · Feb 2025</div>
+        <div class="paper-tagline">1.7B model, 11T tokens, 4-stage training with online data rebalancing. Created FineMath, Stack-Edu, SmolTalk.</div>
+      </a>
+      <a class="paper-card" href="05-flan-collection.html">
+        <div class="paper-num">05</div>
+        <h3>The Flan Collection</h3>
+        <div class="paper-meta">Longpre et al. · arXiv:2301.13688 · Jan 2023</div>
+        <div class="paper-tagline">1800+ tasks. Mixed prompt training, input inversion, task balancing. Flan-T5 beats OPT-IML-Max 175B.</div>
+      </a>
+      <a class="paper-card" href="09-self-instruct.html">
+        <div class="paper-num">09</div>
+        <h3>SELF-INSTRUCT</h3>
+        <div class="paper-meta">Wang et al. · arXiv:2212.10560 · Dec 2022</div>
+        <div class="paper-tagline">Bootstrapping instruction data from 175 seeds. Foundation behind Alpaca and most open instruction datasets.</div>
+      </a>
+    </div>
+
+    <!-- TIER 2 -->
+    <div class="tier-header">Tier 2: Parameter-Efficient Fine-Tuning</div>
+    <div class="tier-desc">What Unsloth does under the hood — LoRA math, quantization, and when full fine-tuning beats adapters.</div>
+
+    <div class="paper-grid">
+      <a class="paper-card" href="06-lora.html">
+        <div class="paper-num">06</div>
+        <h3>LoRA: Low-Rank Adaptation</h3>
+        <div class="paper-meta">Hu et al. · arXiv:2106.09685 · Jun 2021</div>
+        <div class="paper-tagline">ΔW = BA where r &lt;&lt; d,k. 10,000x fewer params, zero inference latency. r=4 often enough. Adapt W_q + W_v.</div>
+      </a>
+      <a class="paper-card" href="07-qlora.html">
+        <div class="paper-num">07</div>
+        <h3>QLORA</h3>
+        <div class="paper-meta">Dettmers et al. · arXiv:2305.14314 · May 2023</div>
+        <div class="paper-tagline">4-bit NF4 + double quantization + paged optimizers. 65B on one GPU. LoRA on ALL layers, not just attention.</div>
+      </a>
+      <a class="paper-card" href="13-sft-dpo-interaction.html">
+        <div class="paper-num">13</div>
+        <h3>SFT-DPO Interaction</h3>
+        <div class="paper-meta">Harry et al. · arXiv:2603.20100 · Mar 2026</div>
+        <div class="paper-tagline">FFT beats LoRA by more than SFT beats DPO. Parameterization > objective. Data scale is king.</div>
+      </a>
+    </div>
+
+    <!-- TIER 3 -->
+    <div class="tier-header">Tier 3: Alignment</div>
+    <div class="tier-desc">From "1,000 examples is enough" to DPO math to monolithic training — the full alignment stack.</div>
+
+    <div class="paper-grid">
+      <a class="paper-card" href="08-lima.html">
+        <div class="paper-num">08</div>
+        <h3>LIMA: Less Is More</h3>
+        <div class="paper-meta">Zhou et al. · arXiv:2305.11206 · May 2023</div>
+        <div class="paper-tagline">Superficial alignment hypothesis. 65B + 1,000 examples = 43% parity with GPT-4. Quality > quantity.</div>
+      </a>
+      <a class="paper-card" href="10-dpo.html">
+        <div class="paper-num">10</div>
+        <h3>Direct Preference Optimization</h3>
+        <div class="paper-meta">Rafailov et al. · arXiv:2305.18290 · May 2023</div>
+        <div class="paper-tagline">RLHF as classification loss. r(x,y) = β·log(π/π_ref). Z(x) cancels. Dynamic gradient weighting.</div>
+      </a>
+      <a class="paper-card" href="11-zephyr.html">
+        <div class="paper-num">11</div>
+        <h3>ZEPHYR: Distilled Alignment</h3>
+        <div class="paper-meta">Tunstall et al. · arXiv:2310.16944 · Oct 2023</div>
+        <div class="paper-tagline">dSFT + AI Feedback + dDPO. 7B surpasses Llama2-Chat-70B. SFT required before DPO. Overfitting not harmful.</div>
+      </a>
+      <a class="paper-card" href="12-orpo.html">
+        <div class="paper-num">12</div>
+        <h3>ORPO: Monolithic Alignment</h3>
+        <div class="paper-meta">Hong et al. · arXiv:2403.07691 · Mar 2024</div>
+        <div class="paper-tagline">Merge SFT + preference in one loss. Odds ratio > probability ratio. No reference model. 2 forward passes.</div>
+      </a>
+    </div>
+
+    <!-- TIER 4 -->
+    <div class="tier-header">Tier 4: Advanced RL & Modern Pipelines</div>
+    <div class="tier-desc">GRPO, process supervision, thinking modes, and the state of the art in 2025.</div>
+
+    <div class="paper-grid">
+      <a class="paper-card" href="14-deepseekmath.html">
+        <div class="paper-num">14</div>
+        <h3>DeepSeekMath & GRPO</h3>
+        <div class="paper-meta">Shao et al. · arXiv:2402.03300 · Feb 2024</div>
+        <div class="paper-tagline">PPO without value function. Group-relative advantages. RL improves Maj@K not Pass@K. Process > outcome.</div>
+      </a>
+      <a class="paper-card" href="15-sft-grpo-overlap.html">
+        <div class="paper-num">15</div>
+        <h3>SFT-GRPO Data Overlap</h3>
+        <div class="paper-meta">arXiv:2604.13515 · Apr 2026</div>
+        <div class="paper-tagline">Disjoint SFT/GRPO data = free +10.4pp. 100% overlap = GRPO redundant. Reward saturation hypothesis.</div>
+      </a>
+      <a class="paper-card" href="16-phi-3.html">
+        <div class="paper-num">16</div>
+        <h3>Phi-3</h3>
+        <div class="paper-meta">Microsoft · arXiv:2404.14219 · Apr 2024</div>
+        <div class="paper-tagline">3.8B on iPhone, 128K context via LongRope, blocksparse attention, MoE. Data-optimal regime.</div>
+      </a>
+      <a class="paper-card" href="17-qwen3.html">
+        <div class="paper-num">17</div>
+        <h3>Qwen3</h3>
+        <div class="paper-meta">Qwen Team · arXiv:2505.09388 · May 2025</div>
+        <div class="paper-tagline">Thinking/non-thinking modes, 4-stage post-training, strong-to-weak distillation. 36T tokens, 119 languages.</div>
+      </a>
+      <a class="paper-card" href="18-unsloth-dpo-guide.html">
+        <div class="paper-num">18</div>
+        <h3>Unsloth DPO/ORPO/KTO Guide</h3>
+        <div class="paper-meta">Unsloth Docs · 2025</div>
+        <div class="paper-tagline">Theory → code. DPOConfig, LoRA targets, ref_model=None, β=0.1. Links to Colab notebooks.</div>
+      </a>
+    </div>
+
+    <!-- READING GUIDE -->
+    <div class="tier-header" style="margin-top: 3rem;">Reading Paths</div>
+
+    <div class="swi-callout">
+      <div class="swi-callout-icon">⏱️</div>
+      <div class="swi-callout-body">
+        <strong>2 hours:</strong> 01 (Attention) → 10 (DPO math) → 08 (LIMA) → 06 (LoRA) → 18 (Unsloth code)<br><br>
+        <strong>5 hours:</strong> Add 03 (Phi-1), 02 (TinyStories), 07 (QLORA), 11 (ZEPHYR), 12 (ORPO)<br><br>
+        <strong>10 hours:</strong> All 18 in order. Each page builds on the previous.
+      </div>
+    </div>
+
+    <div class="swi-pullquote">
+      <p>"The gap between FFT and LoRA is bigger than the gap between SFT and DPO. If your SFT is already strong, investing in better data beats adding DPO."</p>
+    </div>
+
+    <div style="text-align: center; margin-top: 3rem; padding: 1.5rem; background: #f5f5f5; border-radius: 10px;">
+      <p style="font-size: 0.9rem; color: #666; margin: 0;">
+        Generated from 18 papers · No content duplicated across pages · Cross-referenced<br>
+        Source papers: arXiv, Jay Alammar, Unsloth Docs
+      </p>
+    </div>
+
+  </div>
+</section>
+
+</body>
+</html>

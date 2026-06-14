@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LIMA: Less Is More for Alignment</title>
+  <meta name="description" content="1,000 carefully curated examples are enough for alignment — the superficial alignment hypothesis and the case for data quality over quantity.">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Noto+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --swi-ink:    #000000;
+      --swi-muted:  #666;
+      --swi-tldr-bg:#f5f5f5;
+      --swi-link:   #000;
+    }
+
+    body {
+      font-family: 'Noto Sans', sans-serif;
+      color: #000;
+      background: #ffffff;
+    }
+
+    .publication-body a {
+      color: #000;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+    }
+    .publication-body a:hover { border-bottom-color: #000; }
+    .publication-body strong { color: #000; }
+
+    .swi-gradient {
+      background: linear-gradient(90deg, #d4380d, #fa541c, #fa8c16);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-weight: bold;
+    }
+
+    .publication-title {
+      font-family: 'Google Sans', sans-serif;
+      font-size: 2.6rem;
+      line-height: 1.15;
+      letter-spacing: -0.01em;
+      font-weight: 700;
+    }
+    .publication-authors {
+      font-family: 'Google Sans', sans-serif;
+      color: #666;
+      font-size: 1.05rem;
+    }
+    .publication-authors a {
+      color: #000 !important;
+      font-weight: 600;
+    }
+    .publication-authors a:hover { text-decoration: underline; }
+    .author-block { display: inline-block; }
+    .publication-venue {
+      color: #666;
+      font-weight: bold;
+      width: fit-content;
+    }
+
+    .link-block a { margin: 6px 8px; }
+
+    .swi-tldr {
+      background-color: #f5f5f5;
+      border-radius: 10px;
+      padding: 18px 22px;
+      font-family: 'Google Sans', sans-serif;
+      font-size: 1.02rem;
+      line-height: 1.55;
+      max-width: 112%;
+      margin: 10px auto;
+    }
+
+    .swi-caption {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      max-width: 97%;
+      margin: 0.4em auto 0 auto;
+      color: #333;
+    }
+
+    .section h2.title {
+      font-family: 'Google Sans', sans-serif;
+      font-size: 1.85rem;
+      color: #000;
+      font-weight: 700;
+    }
+    .section h3.subtitle,
+    .section h3.title {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 1.25rem;
+      color: #000;
+      font-weight: 600;
+      margin-top: 1.5rem;
+    }
+
+    .publication-body {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 1.08rem;
+      line-height: 1.7;
+      color: #111;
+    }
+    .publication-body p { margin-bottom: 1.1rem; }
+    .publication-body code {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 0.92em;
+      background: #f5f5f5;
+      padding: 0.1em 0.4em;
+      border-radius: 4px;
+      color: #111;
+      font-weight: 500;
+    }
+    .publication-body pre {
+      background: #111;
+      color: #eee;
+      padding: 16px 20px;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
+    .publication-body pre code {
+      background: transparent;
+      color: inherit;
+      padding: 0;
+    }
+
+    .swi-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: 'Google Sans', sans-serif;
+      font-size: 0.95rem;
+      margin: 1.5rem 0;
+    }
+    .swi-table th, .swi-table td {
+      padding: 12px 16px;
+      text-align: left;
+    }
+    .swi-table th {
+      font-weight: 700;
+      color: #000;
+      border-bottom: 2px solid #000;
+    }
+    .swi-table td {
+      border-bottom: 1px solid #eee;
+    }
+    .swi-table tr:last-child td { border-bottom: none; }
+    .swi-table td:first-child { font-weight: 600; }
+    .swi-table-striped tbody tr:nth-child(even) { background: #fafafa; }
+
+    .swi-win { font-weight: 700; }
+
+    .swi-paginate {
+      border-top: 1px solid #e5e9ef;
+      margin-top: 3rem;
+      padding-top: 1.5rem;
+      font-family: 'Google Sans', sans-serif;
+      font-size: 0.95rem;
+    }
+    .swi-paginate a { color: #000; }
+
+    .swi-callout {
+      display: flex;
+      gap: 14px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin: 1.5rem 0;
+    }
+    .swi-callout-icon { font-size: 1.4rem; flex-shrink: 0; }
+    .swi-callout-body { font-size: 0.97rem; line-height: 1.6; }
+
+    .swi-pullquote {
+      margin: 2rem 0;
+      padding: 16px 24px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      font-style: italic;
+      font-size: 1.1rem;
+      line-height: 1.65;
+      color: #333;
+    }
+    .swi-pullquote p { margin: 0; }
+
+    .swi-steps {
+      display: flex;
+      gap: 20px;
+      margin: 1.5rem 0;
+    }
+    .swi-step {
+      flex: 1;
+      display: flex;
+      gap: 12px;
+      background: #f5f5f5;
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .swi-step-number {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #000;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+      flex-shrink: 0;
+    }
+    .swi-step-content h4 {
+      font-size: 0.95rem;
+      margin-bottom: 0.3rem;
+      color: #000;
+    }
+    .swi-step-content p {
+      font-size: 0.88rem;
+      line-height: 1.45;
+      color: #555;
+      margin: 0;
+    }
+
+    .swi-image-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 1.5rem 0;
+    }
+    .swi-figure { margin: 0; }
+    .swi-image-placeholder {
+      background: #f0f0f0;
+      border-radius: 10px;
+      aspect-ratio: 4/3;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      color: #999;
+      font-size: 0.85rem;
+      border: 2px dashed #ddd;
+    }
+    .swi-image-icon { font-size: 1.6rem; }
+    .swi-figure figcaption {
+      font-size: 0.82rem;
+      color: #777;
+      margin-top: 6px;
+      text-align: center;
+    }
+
+    .swi-accordion {
+      border: 1px solid #e5e9ef;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      overflow: hidden;
+    }
+    .swi-accordion summary {
+      padding: 14px 18px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.97rem;
+      background: #f5f5f5;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #000;
+    }
+    .swi-accordion summary::before {
+      content: "▸";
+      transition: transform 0.2s;
+      font-size: 0.8rem;
+      color: #000;
+    }
+    .swi-accordion[open] summary::before { transform: rotate(90deg); }
+    .swi-accordion summary::-webkit-details-marker { display: none; }
+    .swi-accordion-body {
+      padding: 14px 18px;
+      font-size: 0.93rem;
+      line-height: 1.6;
+      border-top: 1px solid #e5e9ef;
+    }
+
+    .swi-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 1rem 0 2rem;
+    }
+    .swi-tag {
+      display: inline-block;
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      background: #f5f5f5;
+      color: #000;
+      border: 1px solid #ddd;
+      transition: background 0.15s;
+    }
+    .swi-tag:hover { background: #000; color: #fff; border-color: #000; }
+
+    .swi-author-card {
+      display: flex;
+      gap: 18px;
+      align-items: center;
+      background: #f5f5f5;
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin: 2rem 0;
+    }
+    .swi-author-avatar {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: #000;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 1.1rem;
+      flex-shrink: 0;
+    }
+    .swi-author-info h4 { margin: 0 0 0.3rem; font-size: 1rem; }
+    .swi-author-info h4 a { color: #000; text-decoration: none; font-weight: 600; }
+    .swi-author-info h4 a:hover { text-decoration: underline; }
+    .swi-author-info p { margin: 0; font-size: 0.9rem; color: #666; }
+
+    .swi-related-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 1rem 0 2rem;
+    }
+    .swi-related-card {
+      display: block;
+      padding: 18px 20px;
+      background: #f5f5f5;
+      border-radius: 10px;
+      text-decoration: none;
+      border: 1px solid transparent;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .swi-related-card:hover {
+      border-color: #000;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    }
+    .swi-related-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #888;
+      font-weight: 600;
+    }
+    .swi-related-card h3 {
+      margin: 6px 0 0;
+      font-size: 0.95rem;
+      color: #000;
+      line-height: 1.4;
+      font-weight: 600;
+    }
+
+    @media (max-width: 768px) {
+      .publication-title { font-size: 1.9rem; }
+      .publication-body { font-size: 1rem; }
+      .swi-steps { flex-direction: column; }
+      .swi-step { flex-direction: column; text-align: center; }
+      .swi-step-number { margin-bottom: 0.5rem; }
+      .swi-image-grid { grid-template-columns: 1fr; }
+      .swi-related-grid { grid-template-columns: 1fr; }
+      .swi-author-card { flex-direction: column; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- HERO -->
+<section class="hero" style="padding-top: 1rem;">
+  <div class="hero-body" style="padding-bottom: 0.5rem;">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+          <h1 class="title is-1 publication-title">
+            <span class="swi-gradient">LIMA: Less Is More for Alignment</span>
+          </h1>
+
+          <div class="is-size-5 publication-authors" style="margin-top: 0.6em;">
+            <span class="author-block"><a href="https://arxiv.org/abs/2305.11206">Zhou et al. (Meta AI)</a></span>
+          </div>
+
+          <div class="is-size-5 publication-authors" style="margin-top: 0.4em;">
+            <span class="publication-venue">arXiv:2305.11206</span>
+          </div>
+
+          <div class="is-size-5 publication-authors" style="margin-top: 0.4em;">
+            <span class="author-block">May 2023</span>
+          </div>
+
+          <div class="column has-text-centered" style="margin-top: 1.2rem;">
+            <div class="publication-links">
+              <span class="link-block">
+                <a href="https://arxiv.org/abs/2305.11206"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon"><i class="fas fa-file-pdf"></i></span>
+                  <span>Paper</span>
+                </a>
+              </span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ABSTRACT (TL;DR) -->
+<section class="section" style="padding-bottom: 0; padding-top: 0;">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <div class="swi-tldr has-text-justified">
+          <p>
+            LIMA demonstrates that a 65B LLaMA model fine-tuned on just 1,000 carefully curated examples can achieve strong alignment, supporting the "superficial alignment hypothesis" — the idea that alignment teaches the model <em>how</em> to present knowledge it already learned during pretraining, not new knowledge itself. Human evaluators preferred or rated LIMA equal to GPT-4 in 43% of cases, and LIMA preferred over DaVinci003 in 65% of cases.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- BODY -->
+<section class="section publication-body" style="padding-top: 1.5rem;">
+  <div class="container is-max-desktop">
+    <div class="content has-text-justified">
+
+      <!-- SECTION 1: The Hypothesis -->
+      <h2 class="title">The Superficial Alignment Hypothesis</h2>
+
+      <div class="swi-pullquote">
+        <p>"We hypothesize that the alignment (supervised fine-tuning) step teaches the model the style and format of interaction, not the knowledge itself. The model has already learned the knowledge during pre-training; alignment is merely a surface-level behavioral adjustment."</p>
+      </div>
+
+      <p>
+        This is the central claim of LIMA, and it has profound implications for how we think about model training. The superficial alignment hypothesis (SAH) makes a strong assertion: the vast majority of what a language model "knows" comes from pre-training on trillions of tokens. The supervised fine-tuning (SFT) step — typically thousands to millions of instruction-response pairs — does not teach the model new facts, reasoning abilities, or world knowledge. Instead, it teaches the model <em>how to present</em> what it already knows in a helpful, structured, assistant-like format.
+      </p>
+
+      <p>
+        If the SAH is correct, then the amount of data needed for SFT is far smaller than commonly assumed. The model doesn't need to learn "how to code" from SFT examples — it already knows how to code from pre-training. It needs to learn "when someone asks a coding question, respond with clean, well-commented code in an assistant style." This is a formatting and behavioral pattern, not knowledge acquisition, and such patterns can be learned from very few examples.
+      </p>
+
+      <h3 class="subtitle">What SAH Does and Doesn't Claim</h3>
+
+      <div class="swi-steps">
+        <div class="swi-step">
+          <div class="swi-step-number">✓</div>
+          <div class="swi-step-content">
+            <h4>SAH Claims</h4>
+            <p>Alignment teaches presentation style, response format, and behavioral patterns. Quality and consistency of training examples matters more than quantity. Pre-training is the primary source of knowledge and capability.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">✗</div>
+          <div class="swi-step-content">
+            <h4>SAH Does NOT Claim</h4>
+            <p>SFT is unnecessary — LIMA still uses 1,000 examples. All alignment data is interchangeable — quality varies enormously. Safety can be achieved without any safety data — LIMA uses 13 safety examples.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 2: Data Curation -->
+      <h2 class="title">Data Curation: The 1,000-Example Dataset</h2>
+
+      <p>
+        LIMA's dataset is a masterclass in deliberate, thoughtful data curation. The 1,000 examples are not randomly sampled — each one is hand-selected or hand-authored to serve a specific purpose:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>Source</th><th>Count</th><th>Purpose</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>StackExchange (STEM)</td><td>200</td><td>Technical accuracy</td><td>High-voted answers from physics, math, CS, and engineering — tests factual precision and reasoning</td></tr>
+          <tr><td>StackExchange (Other)</td><td>200</td><td>Breadth</td><td>Answers from cooking, travel, finance, DIY — ensures non-STEM capability coverage</td></tr>
+          <tr><td>wikiHow</td><td>200</td><td>Structured format</td><td>Step-by-step how-to guides — teaches the model to produce well-organized, procedural responses</td></tr>
+          <tr><td>WritingPrompts</td><td>150</td><td>Creative generation</td><td>Creative writing tasks — ensures the model can produce original, engaging content</td></tr>
+          <tr><td>Natural Instructions</td><td>50</td><td>Instruction following</td><td>Diverse task formats — teaches the model to understand and execute varied instruction types</td></tr>
+          <tr><td>Manually authored</td><td>200</td><td>Style consistency</td><td>Hand-written responses in a consistent assistant style — the most critical category for behavioral alignment</td></tr>
+        </tbody>
+      </table>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">🎯</div>
+        <div class="swi-callout-body">
+          <strong>The Manually Authored 200:</strong> These are arguably the most important examples in the dataset. Each one was written by a human expert to model the ideal assistant response — helpful, detailed, well-structured, and consistent in tone. This establishes the behavioral template that the model learns to replicate. The authors note that these examples were chosen to demonstrate "the desired quality and format" rather than to cover specific knowledge domains.
+        </div>
+      </div>
+
+      <h3 class="subtitle">Curation Principles</h3>
+
+      <p>
+        The authors articulate several principles that guided their data curation process:
+      </p>
+
+      <ul>
+        <li><strong>Quality over quantity:</strong> Every example must meet a high bar for helpfulness, accuracy, and formatting. One excellent example is worth more than ten mediocre ones.</li>
+        <li><strong>Consistency in style:</strong> All responses follow a single, coherent assistant persona. This teaches the model one behavioral pattern rather than a mixture of styles.</li>
+        <li><strong>Diversity in topics:</strong> Despite the small size, the dataset spans STEM, humanities, creative writing, procedural knowledge, and general knowledge.</li>
+        <li><strong>Minimal but present safety data:</strong> Only 13 out of 1,000 examples (1.3%) are safety-related, covering topics like "how to make a bomb" (refusal) and "how to help someone in crisis" (helpful redirection).</li>
+      </ul>
+
+      <!-- SECTION 3: Training Protocol -->
+      <h2 class="title">Training Protocol</h2>
+
+      <p>
+        The training setup is deliberately simple, reflecting the paper's philosophy that complexity is not needed for alignment:
+      </p>
+
+      <pre><code>Base Model:        LLaMA 65B (pre-trained)
+Training Data:     1,000 curated examples
+Epochs:            15 (deliberate overfitting)
+Optimizer:         AdamW (β₁=0.9, β₂=0.95)
+Learning Rate:     1e-5 → 1e-6 (cosine decay)
+Batch Size:        32
+Dropout:           Residual dropout 0 → 0.3 (increased during training)
+Special Token:     End-of-turn (EOT) token for response boundaries
+Checkpoint:        Manual selection (epoch 12 best on held-out quality)</code></pre>
+
+      <h3 class="subtitle">Why 15 Epochs?</h3>
+
+      <p>
+        Training for 15 epochs on 1,000 examples may seem like extreme overfitting. But this is intentional. With only 1,000 examples, the model needs many passes to internalize the behavioral pattern. The authors find that the model's performance actually improves with more epochs, up to a point, because the behavioral template becomes more deeply ingrained. This is different from overfitting in the traditional sense — the model isn't memorizing specific examples, it's learning a transferable behavioral pattern.
+      </p>
+
+      <h3 class="subtitle">Manual Checkpoint Selection</h3>
+
+      <p>
+        Rather than using automated metrics, the authors manually selected the best checkpoint based on qualitative assessment of response quality. This is unusual in modern ML practice but reflects the paper's emphasis on human judgment as the ultimate arbiter of quality. The selected checkpoint (epoch 12) was not the one with lowest training loss — it was the one that produced the most consistently helpful, well-formatted responses.
+      </p>
+
+      <!-- SECTION 4: Results -->
+      <h2 class="title">Human Evaluation Results</h2>
+
+      <p>
+        LIMA was evaluated through extensive human preference studies, comparing against GPT-4, Google Bard, and OpenAI DaVinci003:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>Comparison</th><th>Preference Rate</th><th>Method</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>LIMA vs. GPT-4</td><td>43% (LIMA wins or ties)</td><td>Head-to-head, 300 prompts</td></tr>
+          <tr><td>LIMA vs. Google Bard</td><td class="swi-win">58% (LIMA wins or ties)</td><td>Head-to-head, 300 prompts</td></tr>
+          <tr><td>LIMA vs. DaVinci003</td><td class="swi-win">65% (LIMA wins or ties)</td><td>Head-to-head, 300 prompts</td></tr>
+        </tbody>
+      </table>
+
+      <p>
+        The 43% "preferred or equal to GPT-4" result is remarkable for a model trained on 1,000 examples. However, the authors are careful to note the limitations: this means GPT-4 was preferred 57% of the time. LIMA is not matching GPT-4 — it is demonstrating that a tiny dataset can produce surprisingly competitive alignment.
+      </p>
+
+      <h3 class="subtitle">Absolute Quality Assessment</h3>
+
+      <p>
+        Beyond pairwise comparisons, the authors also assess absolute response quality:
+      </p>
+
+      <pre><code>LIMA Response Quality (300 prompts):
+
+  Excellent:  50%  ← Half the time, responses are top-quality
+  Pass:       38%  ← Acceptable but not outstanding
+  Fail:       12%  ← Inadequate responses
+
+  Pass rate: 88% of responses are at least acceptable.</code></pre>
+
+      <p>
+        The 12% failure rate is significant — it means that roughly 1 in 8 prompts produces a response that doesn't meet a basic quality bar. This is likely because the 1,000-example dataset doesn't cover all possible prompt types, and the model falls back to pre-training behavior (which may not be assistant-aligned) for unfamiliar prompts.
+      </p>
+
+      <h3 class="subtitle">Multi-Turn Dialogue</h3>
+
+      <p>
+        LIMA was also evaluated on multi-turn conversations, which are more challenging than single-turn instruction following:
+      </p>
+
+      <pre><code>Multi-Turn Quality (30 examples, 2 turns each):
+
+  Turn 1 (single-turn):  45% Excellent
+  Turn 2 (multi-turn):   76% Excellent
+
+  Key insight: Performance IMPROVES with context,
+  likely because additional context reduces ambiguity.</code></pre>
+
+      <p>
+        The improvement from 45% to 76% in the "Excellent" category for multi-turn dialogue is surprising and suggests that LIMA's alignment is more robust than single-turn evaluation alone would indicate. When the model has more context, it can produce better responses even with limited SFT data.
+      </p>
+
+      <!-- SECTION 5: Ablations -->
+      <h2 class="title">Ablation Insights</h2>
+
+      <h3 class="subtitle">Quality vs. Quantity</h3>
+
+      <p>
+        The paper's most important ablation compares dataset quality at different scales:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>Configuration</th><th>Size</th><th>Quality</th><th>Performance</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>LIMA (full)</td><td>1,000</td><td>High</td><td class="swi-win">Best</td></tr>
+          <tr><td>Random 1K from 52K</td><td>1,000</td><td>Mixed</td><td>Significantly worse</td></tr>
+          <tr><td>Alpaca-style 52K</td><td>52,000</td><td>Medium</td><td>Worse than LIMA</td></tr>
+          <tr><td>Full 161K OASST1</td><td>161,000</td><td>Variable</td><td>Competitive but different</td></tr>
+        </tbody>
+      </table>
+
+      <p>
+        The critical finding: a carefully curated 1,000-example dataset outperforms a randomly selected 52K dataset from the same source distribution. This is direct evidence that quality dominates quantity for alignment. The randomly selected 52K examples contain many low-quality, inconsistent, or ambiguous responses that confuse the model about the desired behavioral pattern.
+      </p>
+
+      <h3 class="subtitle">Diversity Matters</h3>
+
+      <p>
+        A focused dataset (e.g., 1,000 coding examples) performs worse than LIMA's diverse 1,000, even though the focused dataset has more examples per topic. Diversity teaches the model that the assistant persona applies across all domains, not just one. Without diversity, the model learns to be helpful for coding but may produce unhelpful or off-format responses for other topics.
+      </p>
+
+      <h3 class="subtitle">Quantity Plateaus at ~32K</h3>
+
+      <p>
+        When scaling the dataset size from 1,000 to 161,000, performance improvements plateau around 32,000 examples. Beyond this point, adding more examples provides diminishing returns — the model has already learned the behavioral template, and additional examples merely reinforce what's already known. This connects to the broader finding in [Paper 03] (Textbooks Are All You Need) that data quality drives learning efficiency.
+      </p>
+
+      <!-- SECTION 6: Safety -->
+      <h2 class="title">Safety with 13 Examples</h2>
+
+      <p>
+        Perhaps the most striking result is the safety evaluation. LIMA includes only 13 safety-related training examples (1.3% of the dataset), yet produces responsible behavior:
+      </p>
+
+      <pre><code>Safety Evaluation (300 prompts, red-teaming):
+
+  Safe responses:     80%
+  Unsafe responses:   20%
+
+  For comparison:
+  LLaMA-65B (base, no SFT):  ~40% safe
+  ChatGPT (reference):        ~95% safe</code></pre>
+
+      <p>
+        The 80% safety rate with only 13 examples suggests that safety is primarily a pre-training property — the model has learned during pre-training that certain topics require caution. The 13 SFT examples merely activate this pre-existing knowledge and teach the model to express it in a consistent format (e.g., "I cannot help with that, but I can suggest..."). The remaining 20% unsafe responses likely occur when the model's pre-training signal is insufficient (e.g., novel harmful prompts that weren't covered in pre-training data).
+      </p>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">🔒</div>
+        <div class="swi-callout-body">
+          <strong>Safety Implications:</strong> The LIMA results suggest that safety alignment is not as data-intensive as commonly believed. The heavy lifting is done by pre-training — the model has already learned to be cautious about harmful topics. SFT merely teaches the model to express this caution in a consistent, assistant-like format. This has significant implications for safety alignment strategies: focusing on high-quality pre-training data may be more effective than large-scale safety fine-tuning.
+        </div>
+      </div>
+
+      <!-- SECTION 7: Limitations -->
+      <h2 class="title">Limitations and Honest Assessment</h2>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">⚠️</div>
+        <div class="swi-callout-body">
+          <ul style="margin: 0; padding-left: 1.2rem;">
+            <li><strong>High variance in human evaluation:</strong> The 43% "preferred or equal to GPT-4" result has significant variance. Different evaluators may reach different conclusions, and the 300-prompt sample may not be fully representative.</li>
+            <li><strong>12% failure rate:</strong> One in eight responses is inadequate. This is acceptable for a research demonstration but may be insufficient for production deployment.</li>
+            <li><strong>Data curation labor:</strong> Creating 1,000 high-quality examples requires significant human expertise and effort. The "1,000 examples" figure understates the actual human investment.</li>
+            <li><strong>Adversarial vulnerability:</strong> LIMA's minimal safety training (13 examples) makes it potentially more vulnerable to adversarial attacks than models trained with extensive safety data.</li>
+            <li><strong>Domain limitations:</strong> The 1,000 examples may not cover all deployment scenarios. The model may fail on prompts that don't resemble the training distribution.</li>
+            <li><strong>No RLHF component:</strong> LIMA uses only SFT, without the preference optimization used by most production models. This limits its ability to handle ambiguous or preference-dependent tasks.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- SECTION 8: Practical Implications -->
+      <h2 class="title">Practical Implications</h2>
+
+      <p>
+        LIMA's findings have reshaped how practitioners think about alignment data curation. The key takeaways for practitioners:
+      </p>
+
+      <details class="swi-accordion">
+        <summary>Invest in Data Quality, Not Quantity</summary>
+        <div class="swi-accordion-body">
+          <p>Instead of scraping millions of low-quality instruction-response pairs, invest in hand-curating thousands of high-quality examples. The ROI on data quality improvement is far higher than the ROI on data quantity increase. This connects to [Paper 03] (Phi/Textbooks Are All You Need), which makes the same argument for pre-training data.</p>
+        </div>
+      </details>
+
+      <details class="swi-accordion">
+        <summary>Maintain Style Consistency</summary>
+        <div class="swi-accordion-body">
+          <p>All training examples should follow a consistent response format and tone. Mixed styles confuse the model about the desired behavioral pattern. Choose one persona (e.g., helpful, detailed, well-structured) and ensure every example exemplifies it.</p>
+        </div>
+      </details>
+
+      <details class="swi-accordion">
+        <summary>Cover Topics Broadly</summary>
+        <div class="swi-accordion-body">
+          <p>Despite the small dataset size, cover as many topic areas as possible: STEM, humanities, creative writing, procedural knowledge, and general conversation. Diversity in topics ensures the model generalizes the behavioral pattern across domains.</p>
+        </div>
+      </details>
+
+      <details class="swi-accordion">
+        <summary>Minimal Safety Examples Can Work</summary>
+        <div class="swi-accordion-body">
+          <p>A handful of carefully crafted safety examples (refusals, redirections) can activate safety behaviors that were learned during pre-training. You don't need thousands of safety examples — you need a few exemplary ones that teach the model the desired format for safety-relevant responses.</p>
+        </div>
+      </details>
+
+      <p>
+        LIMA also informs the alignment pipelines discussed in other papers: QLoRA ([Paper 07]) enables efficient fine-tuning of such curated datasets, while DPO ([Paper 10]) and ORPO ([Paper 12]) can build on top of LIMA-style SFT to add preference alignment. Zephyr ([Paper 11]) demonstrates that AI-generated data (UltraChat) can serve as a scalable alternative to human curation, though the LIMA results suggest that the quality bar for such data must remain high.
+      </p>
+
+      <div class="swi-tags">
+        <span class="swi-tag">Data Curation</span>
+        <span class="swi-tag">Superficial Alignment</span>
+        <span class="swi-tag">Quality > Quantity</span>
+        <span class="swi-tag">Style Consistency</span>
+        <span class="swi-tag">Minimal Safety Data</span>
+        <span class="swi-tag">Human Evaluation</span>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

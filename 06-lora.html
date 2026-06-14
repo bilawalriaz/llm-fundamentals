@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LoRA: Low-Rank Adaptation of Large Language Models</title>
+  <meta name="description" content="The foundational PEFT method — inject trainable low-rank matrices into frozen transformer layers, reducing trainable params by 10,000x with zero inference latency.">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Noto+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --swi-ink:    #000000;
+      --swi-muted:  #666;
+      --swi-tldr-bg:#f5f5f5;
+      --swi-link:   #000;
+    }
+
+    body {
+      font-family: 'Noto Sans', sans-serif;
+      color: #000;
+      background: #ffffff;
+    }
+
+    .publication-body a {
+      color: #000;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+    }
+    .publication-body a:hover { border-bottom-color: #000; }
+    .publication-body strong { color: #000; }
+
+    .swi-gradient {
+      background: linear-gradient(90deg, #d4380d, #fa541c, #fa8c16);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-weight: bold;
+    }
+
+    .publication-title {
+      font-family: 'Google Sans', sans-serif;
+      font-size: 2.6rem;
+      line-height: 1.15;
+      letter-spacing: -0.01em;
+      font-weight: 700;
+    }
+    .publication-authors {
+      font-family: 'Google Sans', sans-serif;
+      color: #666;
+      font-size: 1.05rem;
+    }
+    .publication-authors a {
+      color: #000 !important;
+      font-weight: 600;
+    }
+    .publication-authors a:hover { text-decoration: underline; }
+    .author-block { display: inline-block; }
+    .publication-venue {
+      color: #666;
+      font-weight: bold;
+      width: fit-content;
+    }
+
+    .link-block a { margin: 6px 8px; }
+
+    .swi-tldr {
+      background-color: #f5f5f5;
+      border-radius: 10px;
+      padding: 18px 22px;
+      font-family: 'Google Sans', sans-serif;
+      font-size: 1.02rem;
+      line-height: 1.55;
+      max-width: 112%;
+      margin: 10px auto;
+    }
+
+    .swi-caption {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      max-width: 97%;
+      margin: 0.4em auto 0 auto;
+      color: #333;
+    }
+
+    .section h2.title {
+      font-family: 'Google Sans', sans-serif;
+      font-size: 1.85rem;
+      color: #000;
+      font-weight: 700;
+    }
+    .section h3.subtitle,
+    .section h3.title {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 1.25rem;
+      color: #000;
+      font-weight: 600;
+      margin-top: 1.5rem;
+    }
+
+    .publication-body {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 1.08rem;
+      line-height: 1.7;
+      color: #111;
+    }
+    .publication-body p { margin-bottom: 1.1rem; }
+    .publication-body code {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 0.92em;
+      background: #f5f5f5;
+      padding: 0.1em 0.4em;
+      border-radius: 4px;
+      color: #111;
+      font-weight: 500;
+    }
+    .publication-body pre {
+      background: #111;
+      color: #eee;
+      padding: 16px 20px;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
+    .publication-body pre code {
+      background: transparent;
+      color: inherit;
+      padding: 0;
+    }
+
+    .swi-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: 'Google Sans', sans-serif;
+      font-size: 0.95rem;
+      margin: 1.5rem 0;
+    }
+    .swi-table th, .swi-table td {
+      padding: 12px 16px;
+      text-align: left;
+    }
+    .swi-table th {
+      font-weight: 700;
+      color: #000;
+      border-bottom: 2px solid #000;
+    }
+    .swi-table td {
+      border-bottom: 1px solid #eee;
+    }
+    .swi-table tr:last-child td { border-bottom: none; }
+    .swi-table td:first-child { font-weight: 600; }
+    .swi-table-striped tbody tr:nth-child(even) { background: #fafafa; }
+
+    .swi-win { font-weight: 700; }
+
+    .swi-paginate {
+      border-top: 1px solid #e5e9ef;
+      margin-top: 3rem;
+      padding-top: 1.5rem;
+      font-family: 'Google Sans', sans-serif;
+      font-size: 0.95rem;
+    }
+    .swi-paginate a { color: #000; }
+
+    .swi-callout {
+      display: flex;
+      gap: 14px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin: 1.5rem 0;
+    }
+    .swi-callout-icon { font-size: 1.4rem; flex-shrink: 0; }
+    .swi-callout-body { font-size: 0.97rem; line-height: 1.6; }
+
+    .swi-pullquote {
+      margin: 2rem 0;
+      padding: 16px 24px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      font-style: italic;
+      font-size: 1.1rem;
+      line-height: 1.65;
+      color: #333;
+    }
+    .swi-pullquote p { margin: 0; }
+
+    .swi-steps {
+      display: flex;
+      gap: 20px;
+      margin: 1.5rem 0;
+    }
+    .swi-step {
+      flex: 1;
+      display: flex;
+      gap: 12px;
+      background: #f5f5f5;
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .swi-step-number {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #000;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+      flex-shrink: 0;
+    }
+    .swi-step-content h4 {
+      font-size: 0.95rem;
+      margin-bottom: 0.3rem;
+      color: #000;
+    }
+    .swi-step-content p {
+      font-size: 0.88rem;
+      line-height: 1.45;
+      color: #555;
+      margin: 0;
+    }
+
+    .swi-image-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 1.5rem 0;
+    }
+    .swi-figure { margin: 0; }
+    .swi-image-placeholder {
+      background: #f0f0f0;
+      border-radius: 10px;
+      aspect-ratio: 4/3;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      color: #999;
+      font-size: 0.85rem;
+      border: 2px dashed #ddd;
+    }
+    .swi-image-icon { font-size: 1.6rem; }
+    .swi-figure figcaption {
+      font-size: 0.82rem;
+      color: #777;
+      margin-top: 6px;
+      text-align: center;
+    }
+
+    .swi-accordion {
+      border: 1px solid #e5e9ef;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      overflow: hidden;
+    }
+    .swi-accordion summary {
+      padding: 14px 18px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.97rem;
+      background: #f5f5f5;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #000;
+    }
+    .swi-accordion summary::before {
+      content: "▸";
+      transition: transform 0.2s;
+      font-size: 0.8rem;
+      color: #000;
+    }
+    .swi-accordion[open] summary::before { transform: rotate(90deg); }
+    .swi-accordion summary::-webkit-details-marker { display: none; }
+    .swi-accordion-body {
+      padding: 14px 18px;
+      font-size: 0.93rem;
+      line-height: 1.6;
+      border-top: 1px solid #e5e9ef;
+    }
+
+    .swi-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 1rem 0 2rem;
+    }
+    .swi-tag {
+      display: inline-block;
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      background: #f5f5f5;
+      color: #000;
+      border: 1px solid #ddd;
+      transition: background 0.15s;
+    }
+    .swi-tag:hover { background: #000; color: #fff; border-color: #000; }
+
+    .swi-author-card {
+      display: flex;
+      gap: 18px;
+      align-items: center;
+      background: #f5f5f5;
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin: 2rem 0;
+    }
+    .swi-author-avatar {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: #000;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 1.1rem;
+      flex-shrink: 0;
+    }
+    .swi-author-info h4 { margin: 0 0 0.3rem; font-size: 1rem; }
+    .swi-author-info h4 a { color: #000; text-decoration: none; font-weight: 600; }
+    .swi-author-info h4 a:hover { text-decoration: underline; }
+    .swi-author-info p { margin: 0; font-size: 0.9rem; color: #666; }
+
+    .swi-related-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 1rem 0 2rem;
+    }
+    .swi-related-card {
+      display: block;
+      padding: 18px 20px;
+      background: #f5f5f5;
+      border-radius: 10px;
+      text-decoration: none;
+      border: 1px solid transparent;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .swi-related-card:hover {
+      border-color: #000;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    }
+    .swi-related-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #888;
+      font-weight: 600;
+    }
+    .swi-related-card h3 {
+      margin: 6px 0 0;
+      font-size: 0.95rem;
+      color: #000;
+      line-height: 1.4;
+      font-weight: 600;
+    }
+
+    @media (max-width: 768px) {
+      .publication-title { font-size: 1.9rem; }
+      .publication-body { font-size: 1rem; }
+      .swi-steps { flex-direction: column; }
+      .swi-step { flex-direction: column; text-align: center; }
+      .swi-step-number { margin-bottom: 0.5rem; }
+      .swi-image-grid { grid-template-columns: 1fr; }
+      .swi-related-grid { grid-template-columns: 1fr; }
+      .swi-author-card { flex-direction: column; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- HERO -->
+<section class="hero" style="padding-top: 1rem;">
+  <div class="hero-body" style="padding-bottom: 0.5rem;">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+          <h1 class="title is-1 publication-title">
+            <span class="swi-gradient">LoRA: Low-Rank Adaptation of Large Language Models</span>
+          </h1>
+
+          <div class="is-size-5 publication-authors" style="margin-top: 0.6em;">
+            <span class="author-block"><a href="https://arxiv.org/abs/2106.09685">Hu et al. (Microsoft)</a></span>
+          </div>
+
+          <div class="is-size-5 publication-authors" style="margin-top: 0.4em;">
+            <span class="publication-venue">arXiv:2106.09685</span>
+          </div>
+
+          <div class="is-size-5 publication-authors" style="margin-top: 0.4em;">
+            <span class="author-block">June 2021</span>
+          </div>
+
+          <div class="column has-text-centered" style="margin-top: 1.2rem;">
+            <div class="publication-links">
+              <span class="link-block">
+                <a href="https://arxiv.org/abs/2106.09685"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon"><i class="fas fa-file-pdf"></i></span>
+                  <span>Paper</span>
+                </a>
+              </span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ABSTRACT (TL;DR) -->
+<section class="section" style="padding-bottom: 0; padding-top: 0;">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <div class="swi-tldr has-text-justified">
+          <p>
+            LoRA proposes that the weight updates ΔW in large language models during fine-tuning have a low intrinsic rank. By reparameterizing ΔW = BA where B ∈ ℝ<sup>d×r</sup> and A ∈ ℝ<sup>r×k</sup> with r ≪ min(d,k), LoRA freezes all pre-trained weights and trains only these low-rank matrices. This reduces trainable parameters by 10,000× (e.g., 35MB vs 350GB for GPT-3) and GPU memory by 3×, while matching or exceeding full fine-tuning performance. After training, the low-rank update is merged into the base weights, producing zero additional inference latency.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- BODY -->
+<section class="section publication-body" style="padding-top: 1.5rem;">
+  <div class="container is-max-desktop">
+    <div class="content has-text-justified">
+
+      <!-- SECTION 1: Problem Context -->
+      <h2 class="title">The Problem: Why Full Fine-Tuning Is Broken</h2>
+
+      <p>
+        When a language model with hundreds of billions of parameters needs to adapt to a new task — summarization, dialogue, code generation — the naive approach is to update every parameter in the network. For GPT-3 175B, this means storing and computing gradients for 350GB of weights across multiple GPUs. Full fine-tuning is prohibitively expensive not just in computation, but in storage: each downstream task requires a complete copy of the model, making multi-task deployment impractical.
+      </p>
+
+      <p>
+        Prior parameter-efficient approaches each have critical limitations that LoRA was designed to address:
+      </p>
+
+      <div class="swi-steps">
+        <div class="swi-step">
+          <div class="swi-step-number">1</div>
+          <div class="swi-step-content">
+            <h4>Adapter Layers (Houlsby et al., 2019)</h4>
+            <p>Insert small bottleneck layers after each attention block. Adds ~3.6% parameters per adapter but introduces sequential computation, increasing inference latency by 15-30%. Not suitable for latency-sensitive deployment.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">2</div>
+          <div class="swi-step-content">
+            <h4>Prefix Tuning (Li &amp; Liang, 2021)</h4>
+            <p>Prepends trainable vectors to keys and values. Reduces effective sequence length, which degrades performance on long-context tasks. Also suffers from training instability at scale.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">3</div>
+          <div class="swi-step-content">
+            <h4>LoRA (This Paper)</h4>
+            <p>Injects low-rank matrices directly into weight layers. No added latency, no sequence length reduction, no additional inference parameters. The weight update is merged into the base model.</p>
+          </div>
+        </div>
+      </div>
+
+      <p>
+        LoRA's key insight is that the adaptation process can be factored into a low-rank decomposition, and this factorization can be applied directly to the weight matrices that already exist in the model, rather than adding new computational layers.
+      </p>
+
+      <!-- SECTION 2: The Method -->
+      <h2 class="title">The Low-Rank Adaptation Method</h2>
+
+      <h3 class="subtitle">Core Formulation</h3>
+
+      <p>
+        For a pre-trained weight matrix W<sub>0</sub> ∈ ℝ<sup>d×k</sup>, LoRA constrains the update as follows:
+      </p>
+
+      <pre><code>h = W₀ · x + ΔW · x
+
+where:
+  ΔW = B · A
+  B ∈ ℝ^(d×r)    ← learned
+  A ∈ ℝ^(r×k)    ← learned
+  rank r ≪ min(d, k)
+
+Total trainable parameters per layer: r(d + k)
+vs. full fine-tuning: d × k
+Reduction ratio: dk / r(d+k) ≈ k/r for d ≈ k</code></pre>
+
+      <p>
+        For a typical transformer with d = k = 4096 and rank r = 4, the reduction is approximately 1024×. Across 32 layers with W<sub>q</sub> and W<sub>v</sub> adapters, the total trainable parameters are only 2 × 32 × 4 × (4096 + 4096) = ~1M parameters, versus 2 × 32 × 4096² ≈ 1B for full fine-tuning of those same matrices.
+      </p>
+
+      <h3 class="subtitle">Initialization Strategy</h3>
+
+      <p>
+        The initialization of A and B is deliberately asymmetric and critical to LoRA's behavior:
+      </p>
+
+      <pre><code>A ~ N(0, σ²)    ← random Gaussian initialization
+B = 0            ← zero initialization
+
+Result: ΔW = B · A = 0 at initialization</code></pre>
+
+      <p>
+        This means the model starts training from exactly the pre-trained weights, with no perturbation. The random initialization of A ensures that the initial gradient signals are well-conditioned — each element of B receives gradients from a different random linear combination of input features. The zero initialization of B ensures that the LoRA module has no effect until training begins, avoiding any cold-start instability.
+      </p>
+
+      <h3 class="subtitle">Scaling Factor α/r</h3>
+
+      <p>
+        LoRA introduces a scaling factor that controls the magnitude of the low-rank update relative to the pre-trained weights:
+      </p>
+
+      <pre><code>h = W₀ · x + (α/r) · B · A · x
+
+When α = r: the update is unscaled
+When α = 1: the update is scaled by 1/r
+When α = 2r: the update is amplified 2×</code></pre>
+
+      <p>
+        The scaling factor α/r is a hyperparameter that interacts with the learning rate. In practice, setting α = r and tuning the learning rate is equivalent to fixing α and adjusting the learning rate. The authors found that fixing α and varying r gives more intuitive control: as r increases, the model capacity grows, but the per-parameter contribution shrinks proportionally, leading to the observed plateau in performance.
+      </p>
+
+      <h3 class="subtitle">Which Weights to Adapt</h3>
+
+      <p>
+        LoRA can theoretically be applied to any weight matrix in a transformer — W<sub>q</sub>, W<sub>k</sub>, W<sub>v</sub>, W<sub>o</sub> (output projection), and the MLP layers W<sub>up</sub>, W<sub>down</sub>, W<sub>gate</sub>. The paper systematically evaluates which combinations work best under a fixed parameter budget:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>Target Matrices</th><th>Trainable Params</th><th>MNLI</th><th>SST-2</th><th>STS-B</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>W<sub>q</sub> only</td><td>0.5M</td><td>87.5</td><td>95.1</td><td>90.3</td></tr>
+          <tr><td>W<sub>q</sub> + W<sub>v</sub></td><td>1.0M</td><td class="swi-win">87.9</td><td class="swi-win">95.4</td><td class="swi-win">90.7</td></tr>
+          <tr><td>W<sub>q</sub> + W<sub>k</sub> + W<sub>v</sub></td><td>1.5M</td><td>87.7</td><td>95.3</td><td>90.5</td></tr>
+          <tr><td>W<sub>q</sub> + W<sub>k</sub> + W<sub>v</sub> + W<sub>o</sub></td><td>2.0M</td><td>87.7</td><td>95.1</td><td>90.4</td></tr>
+          <tr><td>All attention (q,k,v,o) + MLP</td><td>3.5M</td><td>87.6</td><td>95.0</td><td>90.3</td></tr>
+        </tbody>
+      </table>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">💡</div>
+        <div class="swi-callout-body">
+          <strong>Key Finding:</strong> W<sub>q</sub> + W<sub>v</sub> is the best combination for a given parameter budget. Spreading the budget across more matrices (including W<sub>k</sub> and W<sub>o</sub>) does not improve performance — it actually slightly degrades it. This suggests that the most important adaptation happens in the query and value projections, which control what information the model attends to and what information it retrieves.
+        </div>
+      </div>
+
+      <p>
+        Note that this finding from the original LoRA paper was later superseded by QLoRA (see [Paper 07]), which found that applying LoRA to <strong>all transformer layers</strong> — including MLP layers — is critical when combining LoRA with quantization. The attention-only recommendation applies specifically to the non-quantized, high-precision setting of the original paper.
+      </p>
+
+      <!-- SECTION 3: Intrinsic Low-Rank -->
+      <h2 class="title">Evidence for Intrinsic Low-Rank Structure</h2>
+
+      <p>
+        One of the most important contributions of the LoRA paper is providing empirical evidence that weight updates during fine-tuning have low intrinsic rank. The authors demonstrate this through two key analyses:
+      </p>
+
+      <h3 class="subtitle">Analysis 1: Rank Comparison Across Seeds</h3>
+
+      <p>
+        The authors fine-tune RoBERTa-large on WikiSQL and MultiNLI with different random seeds and LoRA ranks (r = 4, 16, 64). They then perform SVD on the resulting ΔW matrices and measure the cosine similarity between the top singular vectors across different configurations:
+      </p>
+
+      <pre><code>Cosine similarity of top singular vectors of ΔW:
+
+                r=4     r=16    r=64
+Same seed,
+diff rank:      0.98    0.97    0.96
+
+Diff seed,
+same rank:      0.95    0.94    0.93
+
+Cross:          0.93    0.92    0.91</code></pre>
+
+      <p>
+        The consistently high cosine similarity (> 0.9) across different ranks and random seeds demonstrates that the dominant directions of the weight update are stable and consistent. This means the full-rank update ΔW has low intrinsic dimensionality — the same information can be captured with a much lower rank.
+      </p>
+
+      <h3 class="subtitle">Analysis 2: Full Fine-Tuning ΔW vs. LoRA ΔW</h3>
+
+      <p>
+        When the authors perform SVD on the full fine-tuning update ΔW<sub>full</sub> (from training all parameters), they find that the top singular vectors of ΔW<sub>full</sub> are highly correlated with the top singular vectors of ΔW<sub>LoRA</sub>, even though LoRA was trained with a much smaller parameter budget:
+      </p>
+
+      <pre><code>Cosine similarity between ΔW_full and ΔW_LoRA:
+
+RoBERTa-large on WikiSQL:
+  r=4:   0.91
+  r=16:  0.96
+  r=64:  0.98
+
+RoBERTa-large on MNLI:
+  r=4:   0.89
+  r=16:  0.95
+  r=64:  0.97</code></pre>
+
+      <p>
+        This is striking: LoRA with r = 64 captures > 97% of the direction of the full fine-tuning update. The low-rank approximation is not merely an approximation — it recovers the actual dominant structure of the adaptation.
+      </p>
+
+      <h3 class="subtitle">ΔW Amplification vs. Duplication</h3>
+
+      <p>
+        A critical question is whether the low-rank update ΔW merely duplicates what's already in the pre-trained weights W<sub>0</sub>, or whether it genuinely amplifies new, task-specific features. The authors analyze this by comparing the spectral structure of W<sub>0</sub> and ΔW:
+      </p>
+
+      <pre><code>Spectral analysis (RoBERTa-large, r=4):
+
+ΔW singular values:  [8.2, 3.1, 1.4, 0.8]
+W₀ singular values:  [42.1, 31.5, 24.8, ...]
+
+Ratio ΔW/W₀ for top 4 singular values:
+  [0.19, 0.10, 0.06, 0.03]
+
+Key: ΔW is ~20× smaller than W₀ but operates
+in DIFFERENT directions — amplification, not duplication.</code></pre>
+
+      <p>
+        The analysis shows that ΔW's singular vectors are nearly orthogonal to the top singular vectors of W<sub>0</sub>. This means the low-rank update is not simply scaling up what the pre-trained model already knows — it's introducing new, task-specific directions that the pre-training objective didn't emphasize. This is the phenomenon of "amplification" that the authors identify.
+      </p>
+
+      <div class="swi-pullquote">
+        <p>"The pre-trained model has already learned a rich representation. Fine-tuning doesn't need to learn new knowledge — it needs to amplify task-specific features that were under-emphasized during pre-training. LoRA does exactly this, with remarkable parameter efficiency."</p>
+      </div>
+
+      <!-- SECTION 4: Results -->
+      <h2 class="title">Experimental Results</h2>
+
+      <h3 class="subtitle">Encoder Models: RoBERTa and DeBERTa</h3>
+
+      <p>
+        On natural language understanding benchmarks, LoRA matches or exceeds full fine-tuning with orders of magnitude fewer parameters:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>Model</th><th>Method</th><th>Trainable Params</th><th>MNLI-m</th><th>SST-2</th><th>QNLI</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>RoBERTa-base</td><td>Fine-tune</td><td>125M</td><td>87.6</td><td>94.8</td><td>92.7</td></tr>
+          <tr><td>RoBERTa-base</td><td>LoRA (r=4)</td><td>0.3M</td><td>87.5</td><td class="swi-win">95.1</td><td class="swi-win">93.0</td></tr>
+          <tr><td>RoBERTa-large</td><td>Fine-tune</td><td>355M</td><td>90.2</td><td>96.4</td><td>94.7</td></tr>
+          <tr><td>RoBERTa-large</td><td>LoRA (r=8)</td><td>0.8M</td><td class="swi-win">90.6</td><td class="swi-win">96.6</td><td class="swi-win">95.1</td></tr>
+          <tr><td>DeBERTa-XXL</td><td>Fine-tune</td><td>1.5B</td><td>91.8</td><td>97.2</td><td>96.3</td></tr>
+          <tr><td>DeBERTa-XXL</td><td>LoRA (r=16)</td><td>4.7M</td><td class="swi-win">91.9</td><td>96.9</td><td class="swi-win">96.5</td></tr>
+        </tbody>
+      </table>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">📊</div>
+        <div class="swi-callout-body">
+          <strong>Parameter Reduction:</strong> For RoBERTa-large with LoRA, only 0.2% of parameters are trained (0.8M out of 355M). For DeBERTa-XXL, only 0.3% of parameters are trained (4.7M out of 1.5B). In both cases, LoRA matches or exceeds the full fine-tuning baseline.
+        </div>
+      </div>
+
+      <h3 class="subtitle">Decoder Models: GPT-3 175B</h3>
+
+      <p>
+        The paper also evaluates LoRA on GPT-3 175B, the largest model tested. Due to the scale, only a subset of tasks is evaluated:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>Method</th><th>Trainable Params</th><th>WikiSQL (acc)</th><th>SAMSum (R-L)</th><th>OpenAIWeb</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Fine-tune (full)</td><td>175B</td><td>73.8</td><td>53.2</td><td>78.1</td></tr>
+          <tr><td>LoRA (r=8, W<sub>q</sub>+W<sub>v</sub>)</td><td>3.5M</td><td class="swi-win">74.3</td><td class="swi-win">53.8</td><td class="swi-win">78.4</td></tr>
+          <tr><td>LoRA (r=64, all attn)</td><td>28M</td><td>74.5</td><td>53.9</td><td>78.5</td></tr>
+        </tbody>
+      </table>
+
+      <p>
+        Even at 175B parameter scale, LoRA with only 3.5M trainable parameters matches full fine-tuning. The scaling law holds: larger models benefit proportionally more from LoRA because the fraction of parameters being trained becomes even smaller.
+      </p>
+
+      <!-- SECTION 5: Rank Analysis -->
+      <h2 class="title">Rank Analysis and Hyperparameter Sensitivity</h2>
+
+      <h3 class="subtitle">How Much Rank Do You Need?</h3>
+
+      <p>
+        One of the most practically useful findings in the paper is the relationship between rank r and downstream performance:
+      </p>
+
+      <pre><code>Performance vs. Rank (RoBERTa-large, MNLI):
+
+r=1:   87.8  ← already strong
+r=2:   88.4
+r=4:   90.2  ← near-optimal
+r=8:   90.6  ← optimal point
+r=16:  90.5  ← plateau begins
+r=32:  90.6  ← no improvement
+r=64:  90.6  ← clearly diminishing returns
+r=128: 90.5  ← slight degradation (overfitting?)
+
+Key: Performance plateaus at r=8, suggesting
+the task-specific adaptation has intrinsic
+dimensionality of ~8 or less.</code></pre>
+
+      <p>
+        The plateau at r ≈ 8 across multiple tasks and models provides strong evidence for the intrinsic low-rank hypothesis. The weight updates during fine-tuning live in a low-dimensional subspace of the full parameter space, and capturing the top 4-8 dimensions is sufficient for most tasks.
+      </p>
+
+      <h3 class="subtitle">Learning Rate and Batch Size</h3>
+
+      <p>
+        The paper recommends the following hyperparameter settings, which were found to be robust across tasks:
+      </p>
+
+      <div class="swi-tags">
+        <span class="swi-tag">AdamW optimizer</span>
+        <span class="swi-tag">Learning rate: 1e-4 to 3e-4</span>
+        <span class="swi-tag">Batch size: 128</span>
+        <span class="swi-tag">Epochs: 2</span>
+        <span class="swi-tag">Warmup: linear (first 6% of steps)</span>
+        <span class="swi-tag">Weight decay: 0.1</span>
+      </div>
+
+      <p>
+        LoRA is remarkably insensitive to these hyperparameters. The learning rate can vary by an order of magnitude (1e-4 to 3e-4) without significant performance degradation. This is in stark contrast to full fine-tuning, where learning rate is one of the most critical hyperparameters. The authors attribute this stability to the constrained parameter space — with only r(d + k) parameters per layer, the optimization landscape is smoother and more forgiving.
+      </p>
+
+      <!-- SECTION 6: Inference and Deployment -->
+      <h2 class="title">Inference: Zero Latency, Weight Merging</h2>
+
+      <p>
+        LoRA's most important deployment advantage is that the low-rank matrices can be merged into the base weights at no additional cost:
+      </p>
+
+      <pre><code>Training time:
+  h = W₀ · x + (α/r) · B · A · x
+
+Deployment (merge once):
+  W_new = W₀ + (α/r) · B · A
+
+Inference:
+  h = W_new · x    ← identical to original model
+  No extra FLOPs, no extra memory, no extra latency</code></pre>
+
+      <p>
+        This is fundamentally different from adapter-based methods, which add sequential computation at inference time. With LoRA, the adapter is "absorbed" into the base weights, producing a model that is architecturally identical to the original. This means:
+      </p>
+
+      <ul>
+        <li><strong>No inference overhead:</strong> The merged model runs at exactly the same speed as the original pre-trained model.</li>
+        <li><strong>No architecture changes:</strong> The model's forward pass, attention patterns, and computational graph are unchanged.</li>
+        <li><strong>No additional memory:</strong> The base model and LoRA weights can be combined and the LoRA weights discarded.</li>
+      </ul>
+
+      <h3 class="subtitle">Task Switching</h3>
+
+      <p>
+        For serving multiple tasks from a single base model, LoRA enables extremely efficient task switching:
+      </p>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">🔄</div>
+        <div class="swi-callout-body">
+          <strong>Task Switching Protocol:</strong> Keep one copy of W<sub>0</sub> in memory. Store small LoRA modules (0.3-4.7MB each) for each task. To switch tasks, simply compute W<sub>0</sub> + BA for the target task and serve. For 100 tasks, this requires ~350GB base model + 350MB total LoRA modules — vs. 100 × 350GB = 35TB for full fine-tuning.
+        </div>
+      </div>
+
+      <!-- SECTION 7: Practical Guide -->
+      <h2 class="title">Practical Implementation Guide</h2>
+
+      <details class="swi-accordion">
+        <summary>Choosing Rank r</summary>
+        <div class="swi-accordion-body">
+          <p><strong>r = 4-8</strong> is sufficient for most tasks. Use r = 4 as a starting point and increase only if performance is critical and the task is complex. For most practical applications, r = 4 gives > 99% of the performance of r = 64. Higher ranks are only necessary when the fine-tuning task diverges significantly from the pre-training distribution (e.g., adapting an English model to a non-English language).</p>
+        </div>
+      </details>
+
+      <details class="swi-accordion">
+        <summary>Choosing Target Matrices</summary>
+        <div class="swi-accordion-body">
+          <p><strong>W<sub>q</sub> + W<sub>v</sub></strong> is the default recommendation for non-quantized models. This combination captures both "what to attend to" (query) and "what to retrieve" (value). For quantized models (QLoRA), apply LoRA to <strong>all linear layers</strong> including MLP — this is the critical finding from [Paper 07]. When in doubt, start with W<sub>q</sub> + W<sub>v</sub> and expand only if needed.</p>
+        </div>
+      </details>
+
+      <details class="swi-accordion">
+        <summary>Learning Rate and Training</summary>
+        <div class="swi-accordion-body">
+          <p><strong>Learning rate: 2e-4</strong> with AdamW optimizer. Batch size 128, 2 epochs with linear warmup for 6% of steps. LoRA is surprisingly insensitive to learning rate — a range of [1e-4, 3e-4] works across most tasks. Use gradient clipping at 1.0 for stability. No weight decay is needed on LoRA parameters (the base model already has it). The scaling factor α = r is recommended as a default.</p>
+        </div>
+      </details>
+
+      <details class="swi-accordion">
+        <summary>Memory Requirements</summary>
+        <div class="swi-accordion-body">
+          <p>Only optimizer states (AdamW: m and v) for LoRA parameters need to be stored, plus the LoRA parameters themselves and gradients. For a 7B model with LoRA (r=8, W<sub>q</sub>+W<sub>v</sub>): LoRA params = 4.2M, optimizer states = 16.8M, gradients = 4.2M → ~25MB total, vs. 56GB for full fine-tuning. This is roughly a <strong>2,200× reduction</strong> in memory for optimizer states.</p>
+        </div>
+      </details>
+
+      <!-- SECTION 8: Limitations -->
+      <h2 class="title">Limitations and Honest Assessment</h2>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">⚠️</div>
+        <div class="swi-callout-body">
+          <strong>Limitations to consider:</strong>
+          <ul style="margin: 0.5rem 0 0 0; padding-left: 1.2rem;">
+            <li><strong>Intrinsic rank is task-dependent:</strong> While r = 4-8 works for most tasks, some tasks (especially those requiring significant domain shift) may need higher ranks. The paper does not provide a principled method for choosing r a priori.</li>
+            <li><strong>Layer selection is heuristic:</strong> The W<sub>q</sub> + W<sub>v</sub> recommendation is empirical, not theoretically grounded. For different architectures or training regimes, different choices may be optimal.</li>
+            <li><strong>No theoretical guarantee:</strong> The intrinsic low-rank hypothesis is supported empirically but not proven theoretically. There is no guarantee that the task-specific adaptation will always be low-rank.</li>
+            <li><strong>Interaction with other techniques:</strong> The paper does not explore LoRA's interaction with other PEFT methods, quantization (addressed by QLoRA in [Paper 07]), or RLHF/DPO training.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- SECTION 9: Practical Implications -->
+      <h2 class="title">Practical Implications and Legacy</h2>
+
+      <p>
+        LoRA has become arguably the most impactful efficiency technique in modern LLM training and deployment. Its influence extends far beyond the original paper:
+      </p>
+
+      <ul>
+        <li><strong>QLoRA ([Paper 07]):</strong> Combined 4-bit quantization with LoRA, enabling fine-tuning of 65B models on a single GPU. The finding that LoRA should be applied to ALL layers (not just attention) when using quantization was a critical extension.</li>
+        <li><strong>Zephyr ([Paper 11]):</strong> Used LoRA throughout the dSFT and dDPO pipeline, demonstrating that LoRA is compatible with preference optimization methods.</li>
+        <li><strong>ORPO ([Paper 12]):</strong> ORPO's monolithic loss formulation can be applied directly with LoRA, combining SFT and preference optimization in a single stage.</li>
+        <li><strong>DPO ([Paper 10]):</strong> While DPO doesn't require LoRA specifically, LoRA is the de facto standard for applying DPO to large models due to memory constraints.</li>
+      </ul>
+
+      <p>
+        The key insight of LoRA — that fine-tuning updates have low intrinsic rank — has influenced how practitioners think about model adaptation. It suggests that the pre-trained model has already learned most of what it needs to know, and adaptation is about amplifying specific capabilities rather than learning from scratch. This insight is also connected to [Paper 03] (Textbooks Are All You Need), which argues that data quality matters more than scale for fine-tuning, and [Paper 08] (LIMA), which shows that 1,000 high-quality examples suffice for alignment.
+      </p>
+
+      <div class="swi-tags">
+        <span class="swi-tag">Parameter-Efficient Fine-Tuning</span>
+        <span class="swi-tag">Low-Rank Decomposition</span>
+        <span class="swi-tag">Weight Merging</span>
+        <span class="swi-tag">Intrinsic Dimensionality</span>
+        <span class="swi-tag">Zero Inference Latency</span>
+        <span class="swi-tag">Multi-Task Serving</span>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

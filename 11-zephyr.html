@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ZEPHYR: Direct Distillation of LM Alignment</title>
+  <meta name="description" content="A 7B model surpasses Llama2-Chat-70B through a fully automated 3-step pipeline: distillation-SFT, AI feedback, and distillation-DPO — no human annotation needed.">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Noto+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --swi-ink:    #000000;
+      --swi-muted:  #666;
+      --swi-tldr-bg:#f5f5f5;
+      --swi-link:   #000;
+    }
+
+    body {
+      font-family: 'Noto Sans', sans-serif;
+      color: #000;
+      background: #ffffff;
+    }
+
+    .publication-body a {
+      color: #000;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+    }
+    .publication-body a:hover { border-bottom-color: #000; }
+    .publication-body strong { color: #000; }
+
+    .swi-gradient {
+      background: linear-gradient(90deg, #d4380d, #fa541c, #fa8c16);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-weight: bold;
+    }
+
+    .publication-title {
+      font-family: 'Google Sans', sans-serif;
+      font-size: 2.6rem;
+      line-height: 1.15;
+      letter-spacing: -0.01em;
+      font-weight: 700;
+    }
+    .publication-authors {
+      font-family: 'Google Sans', sans-serif;
+      color: #666;
+      font-size: 1.05rem;
+    }
+    .publication-authors a {
+      color: #000 !important;
+      font-weight: 600;
+    }
+    .publication-authors a:hover { text-decoration: underline; }
+    .author-block { display: inline-block; }
+    .publication-venue {
+      color: #666;
+      font-weight: bold;
+      width: fit-content;
+    }
+
+    .link-block a { margin: 6px 8px; }
+
+    .swi-tldr {
+      background-color: #f5f5f5;
+      border-radius: 10px;
+      padding: 18px 22px;
+      font-family: 'Google Sans', sans-serif;
+      font-size: 1.02rem;
+      line-height: 1.55;
+      max-width: 112%;
+      margin: 10px auto;
+    }
+
+    .swi-caption {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      max-width: 97%;
+      margin: 0.4em auto 0 auto;
+      color: #333;
+    }
+
+    .section h2.title {
+      font-family: 'Google Sans', sans-serif;
+      font-size: 1.85rem;
+      color: #000;
+      font-weight: 700;
+    }
+    .section h3.subtitle,
+    .section h3.title {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 1.25rem;
+      color: #000;
+      font-weight: 600;
+      margin-top: 1.5rem;
+    }
+
+    .publication-body {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 1.08rem;
+      line-height: 1.7;
+      color: #111;
+    }
+    .publication-body p { margin-bottom: 1.1rem; }
+    .publication-body code {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 0.92em;
+      background: #f5f5f5;
+      padding: 0.1em 0.4em;
+      border-radius: 4px;
+      color: #111;
+      font-weight: 500;
+    }
+    .publication-body pre {
+      background: #111;
+      color: #eee;
+      padding: 16px 20px;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
+    .publication-body pre code {
+      background: transparent;
+      color: inherit;
+      padding: 0;
+    }
+
+    .swi-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: 'Google Sans', sans-serif;
+      font-size: 0.95rem;
+      margin: 1.5rem 0;
+    }
+    .swi-table th, .swi-table td {
+      padding: 12px 16px;
+      text-align: left;
+    }
+    .swi-table th {
+      font-weight: 700;
+      color: #000;
+      border-bottom: 2px solid #000;
+    }
+    .swi-table td {
+      border-bottom: 1px solid #eee;
+    }
+    .swi-table tr:last-child td { border-bottom: none; }
+    .swi-table td:first-child { font-weight: 600; }
+    .swi-table-striped tbody tr:nth-child(even) { background: #fafafa; }
+
+    .swi-win { font-weight: 700; }
+
+    .swi-paginate {
+      border-top: 1px solid #e5e9ef;
+      margin-top: 3rem;
+      padding-top: 1.5rem;
+      font-family: 'Google Sans', sans-serif;
+      font-size: 0.95rem;
+    }
+    .swi-paginate a { color: #000; }
+
+    .swi-callout {
+      display: flex;
+      gap: 14px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin: 1.5rem 0;
+    }
+    .swi-callout-icon { font-size: 1.4rem; flex-shrink: 0; }
+    .swi-callout-body { font-size: 0.97rem; line-height: 1.6; }
+
+    .swi-pullquote {
+      margin: 2rem 0;
+      padding: 16px 24px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      font-style: italic;
+      font-size: 1.1rem;
+      line-height: 1.65;
+      color: #333;
+    }
+    .swi-pullquote p { margin: 0; }
+
+    .swi-steps {
+      display: flex;
+      gap: 20px;
+      margin: 1.5rem 0;
+    }
+    .swi-step {
+      flex: 1;
+      display: flex;
+      gap: 12px;
+      background: #f5f5f5;
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .swi-step-number {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #000;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+      flex-shrink: 0;
+    }
+    .swi-step-content h4 {
+      font-size: 0.95rem;
+      margin-bottom: 0.3rem;
+      color: #000;
+    }
+    .swi-step-content p {
+      font-size: 0.88rem;
+      line-height: 1.45;
+      color: #555;
+      margin: 0;
+    }
+
+    .swi-image-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 1.5rem 0;
+    }
+    .swi-figure { margin: 0; }
+    .swi-image-placeholder {
+      background: #f0f0f0;
+      border-radius: 10px;
+      aspect-ratio: 4/3;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      color: #999;
+      font-size: 0.85rem;
+      border: 2px dashed #ddd;
+    }
+    .swi-image-icon { font-size: 1.6rem; }
+    .swi-figure figcaption {
+      font-size: 0.82rem;
+      color: #777;
+      margin-top: 6px;
+      text-align: center;
+    }
+
+    .swi-accordion {
+      border: 1px solid #e5e9ef;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      overflow: hidden;
+    }
+    .swi-accordion summary {
+      padding: 14px 18px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.97rem;
+      background: #f5f5f5;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #000;
+    }
+    .swi-accordion summary::before {
+      content: "▸";
+      transition: transform 0.2s;
+      font-size: 0.8rem;
+      color: #000;
+    }
+    .swi-accordion[open] summary::before { transform: rotate(90deg); }
+    .swi-accordion summary::-webkit-details-marker { display: none; }
+    .swi-accordion-body {
+      padding: 14px 18px;
+      font-size: 0.93rem;
+      line-height: 1.6;
+      border-top: 1px solid #e5e9ef;
+    }
+
+    .swi-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 1rem 0 2rem;
+    }
+    .swi-tag {
+      display: inline-block;
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      background: #f5f5f5;
+      color: #000;
+      border: 1px solid #ddd;
+      transition: background 0.15s;
+    }
+    .swi-tag:hover { background: #000; color: #fff; border-color: #000; }
+
+    .swi-author-card {
+      display: flex;
+      gap: 18px;
+      align-items: center;
+      background: #f5f5f5;
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin: 2rem 0;
+    }
+    .swi-author-avatar {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: #000;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 1.1rem;
+      flex-shrink: 0;
+    }
+    .swi-author-info h4 { margin: 0 0 0.3rem; font-size: 1rem; }
+    .swi-author-info h4 a { color: #000; text-decoration: none; font-weight: 600; }
+    .swi-author-info h4 a:hover { text-decoration: underline; }
+    .swi-author-info p { margin: 0; font-size: 0.9rem; color: #666; }
+
+    .swi-related-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 1rem 0 2rem;
+    }
+    .swi-related-card {
+      display: block;
+      padding: 18px 20px;
+      background: #f5f5f5;
+      border-radius: 10px;
+      text-decoration: none;
+      border: 1px solid transparent;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .swi-related-card:hover {
+      border-color: #000;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    }
+    .swi-related-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #888;
+      font-weight: 600;
+    }
+    .swi-related-card h3 {
+      margin: 6px 0 0;
+      font-size: 0.95rem;
+      color: #000;
+      line-height: 1.4;
+      font-weight: 600;
+    }
+
+    @media (max-width: 768px) {
+      .publication-title { font-size: 1.9rem; }
+      .publication-body { font-size: 1rem; }
+      .swi-steps { flex-direction: column; }
+      .swi-step { flex-direction: column; text-align: center; }
+      .swi-step-number { margin-bottom: 0.5rem; }
+      .swi-image-grid { grid-template-columns: 1fr; }
+      .swi-related-grid { grid-template-columns: 1fr; }
+      .swi-author-card { flex-direction: column; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- HERO -->
+<section class="hero" style="padding-top: 1rem;">
+  <div class="hero-body" style="padding-bottom: 0.5rem;">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+          <h1 class="title is-1 publication-title">
+            <span class="swi-gradient">ZEPHYR: Direct Distillation of LM Alignment</span>
+          </h1>
+
+          <div class="is-size-5 publication-authors" style="margin-top: 0.6em;">
+            <span class="author-block"><a href="https://arxiv.org/abs/2310.16944">Tunstall et al. (HuggingFace)</a></span>
+          </div>
+
+          <div class="is-size-5 publication-authors" style="margin-top: 0.4em;">
+            <span class="publication-venue">arXiv:2310.16944</span>
+          </div>
+
+          <div class="is-size-5 publication-authors" style="margin-top: 0.4em;">
+            <span class="author-block">October 2023</span>
+          </div>
+
+          <div class="column has-text-centered" style="margin-top: 1.2rem;">
+            <div class="publication-links">
+              <span class="link-block">
+                <a href="https://arxiv.org/abs/2310.16944"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon"><i class="fas fa-file-pdf"></i></span>
+                  <span>Paper</span>
+                </a>
+              </span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ABSTRACT (TL;DR) -->
+<section class="section" style="padding-bottom: 0; padding-top: 0;">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <div class="swi-tldr has-text-justified">
+          <p>
+            Zephyr-7B is a 7B parameter model that surpasses Llama2-Chat-70B on MT-Bench through a three-stage automated pipeline: distillation-SFT on UltraChat (1.47M conversations filtered to 200K), AI feedback on UltraFeedback (64K samples with GPT-4 scoring), and distillation-DPO with β=0.1 for 3 epochs. The entire pipeline uses AI-generated data with zero human annotation, requires only 16 A100 GPUs for 2-4 hours per stage, and demonstrates that SFT is a necessary prerequisite for DPO to function properly.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- BODY -->
+<section class="section publication-body" style="padding-top: 1.5rem;">
+  <div class="container is-max-desktop">
+    <div class="content has-text-justified">
+
+      <!-- SECTION 1: The Pipeline -->
+      <h2 class="title">The Three-Stage Pipeline</h2>
+
+      <p>
+        Zephyr's alignment pipeline is a refinement of the standard SFT → DPO sequence, with each stage carefully optimized for data quality and training efficiency. The key innovation is using AI-generated data at every stage, eliminating the need for human annotation entirely.
+      </p>
+
+      <div class="swi-steps">
+        <div class="swi-step">
+          <div class="swi-step-number">1</div>
+          <div class="swi-step-content">
+            <h4>Distillation-SFT (dSFT)</h4>
+            <p>Train on 200K filtered conversations from UltraChat (originally 1.47M). Data generated by GPT-3.5-turbo. 1 epoch. Establishes conversational format and instruction-following.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">2</div>
+          <div class="swi-step-content">
+            <h4>AI Feedback (AIF)</h4>
+            <p>Generate 4 candidate responses per prompt from the dSFT model. Score all candidates with GPT-4. Keep best and worst as chosen/rejected pairs. 64K preference pairs.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">3</div>
+          <div class="swi-step-content">
+            <h4>Distillation-DPO (dDPO)</h4>
+            <p>Apply DPO ([Paper 10]) with β=0.1, 3 epochs, learning rate 5e-7. No reference model needed — the dSFT model serves as π<sub>ref</sub>.</p>
+          </div>
+        </div>
+      </div>
+
+      <h3 class="subtitle">Stage 1: Distillation-SFT (dSFT)</h3>
+
+      <p>
+        UltraChat is a large-scale dataset of multi-turn conversations generated by GPT-3.5-turbo. The original dataset contains 1.47M conversations, but the authors apply quality filtering to retain only 200K — a 7:1 reduction. This filtering step is critical: the original dataset contains many low-quality, repetitive, or off-topic conversations that would degrade the model's behavioral pattern. This connects directly to [Paper 08] (LIMA), which demonstrates that data quality dominates quantity for alignment.
+      </p>
+
+      <p>
+        The dSFT model is trained for exactly 1 epoch on the filtered dataset. The authors find that more epochs lead to overfitting on the training data, which paradoxically doesn't hurt benchmark performance but degrades the model's ability to generalize to unseen prompt types.
+      </p>
+
+      <h3 class="subtitle">Stage 2: AI Feedback (AIF)</h3>
+
+      <p>
+        The AIF stage generates preference data without any human annotation:
+      </p>
+
+      <pre><code>AIF Data Generation Process:
+
+1. Sample 64K prompts from the UltraChat training set
+2. For each prompt, generate 4 candidate responses
+   using the dSFT model (temperature 0.7)
+3. Score all 4 responses with GPT-4
+4. Select:
+   - Best response (highest GPT-4 score) → chosen (y_w)
+   - Worst response (lowest GPT-4 score) → rejected (y_l)
+5. Result: 64K (prompt, chosen, rejected) triples
+
+Total API calls: 64K × 4 = 256K GPT-4 calls
+Cost: ~$2,000 (at GPT-4 API pricing)
+Time: ~6 hours on a single machine</code></pre>
+
+      <p>
+        The use of 4 candidates (rather than 2) provides richer signal: GPT-4 can rank all 4 and select the extreme pairs, which produces cleaner preference data than binary comparison. The chosen/rejected split is maximally informative — the best and worst responses differ the most in quality, making the DPO signal strongest.
+      </p>
+
+      <h3 class="subtitle">Stage 3: Distillation-DPO (dDPO)</h3>
+
+      <p>
+        The dDPO stage applies the DPO loss ([Paper 10]) with specific settings optimized for the Zephyr pipeline:
+      </p>
+
+      <pre><code>dDPO Training Configuration:
+
+Base model:       Zephyr-dSFT (from Stage 1)
+Reference model:  Zephyr-dSFT (same as base, frozen)
+Loss:             DPO ([Paper 10])
+β:                0.1 (strong KL penalty)
+Learning rate:    5e-7
+Epochs:           3
+Batch size:       64
+Warmup:           3% of steps
+Optimizer:        AdamW (β₁=0.9, β₂=0.95)
+Hardware:         16 × A100 80GB GPUs
+Training time:    ~2-4 hours</code></pre>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">💡</div>
+        <div class="swi-callout-body">
+          <strong>Why β = 0.1?</strong> The choice of β = 0.1 (matching the DPO paper's recommendation) reflects a conservative approach: keep the policy close to the reference (dSFT) model. This prevents the DPO stage from "forgetting" the behavioral patterns learned during SFT. Higher β values (e.g., 0.5) allow more divergence from the reference, which can lead to reward hacking on the GPT-4 preferences.
+        </div>
+      </div>
+
+      <!-- SECTION 2: Results -->
+      <h2 class="title">Results: Beating 10× Larger Models</h2>
+
+      <p>
+        Zephyr-7B achieves remarkable results on conversational benchmarks, surpassing models with 10× more parameters:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>Model</th><th>Size</th><th>MT-Bench</th><th>AlpacaEval</th><th>Training</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Llama2-Chat</td><td>7B</td><td>6.27</td><td>26.14%</td><td>RLHF (human)</td></tr>
+          <tr><td>Llama2-Chat</td><td>13B</td><td>6.75</td><td>37.27%</td><td>RLHF (human)</td></tr>
+          <tr><td>Llama2-Chat</td><td>70B</td><td>7.11</td><td>57.58%</td><td>RLHF (human)</td></tr>
+          <tr><td>Mistral-Instruct</td><td>7B</td><td>7.14</td><td>51.40%</td><td>DPO (human)</td></tr>
+          <tr><td>Xwin-LM</td><td>70B</td><td>7.24</td><td>71.03%</td><td>RLHF (human)</td></tr>
+          <tr><td class="swi-win">Zephyr-7B</td><td class="swi-win">7B</td><td class="swi-win">7.34</td><td class="swi-win">90.60%</td><td>dDPO (AI only)</td></tr>
+          <tr><td>GPT-3.5-Turbo</td><td>—</td><td>7.94</td><td>—</td><td>Proprietary</td></tr>
+        </tbody>
+      </table>
+
+      <div class="swi-pullquote">
+        <p>"Zephyr-7B achieves 7.34 on MT-Bench and 90.60% on AlpacaEval — surpassing Llama2-Chat-70B (7.11, 57.58%) despite being trained on a fully automated pipeline with zero human annotation. The 10× parameter advantage of Llama2-Chat is completely negated by better alignment data and methodology."</p>
+      </div>
+
+      <h3 class="subtitle">Academic Benchmarks</h3>
+
+      <p>
+        Beyond conversational quality, Zephyr maintains competitive performance on standard academic benchmarks, demonstrating that alignment training doesn't degrade the base model's capabilities:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>Benchmark</th><th>Zephyr-7B</th><th>Mistral-7B (base)</th><th>Llama2-Chat-7B</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>ARC (Challenge)</td><td>62.03</td><td>63.07</td><td>52.32</td></tr>
+          <tr><td>HellaSwag</td><td>84.52</td><td>84.84</td><td>78.58</td></tr>
+          <tr><td>MMLU</td><td>61.44</td><td>62.52</td><td>46.89</td></tr>
+          <tr><td>TruthfulQA</td><td>57.44</td><td>53.11</td><td>53.89</td></tr>
+          <tr><td>Winogrande</td><td>77.61</td><td>79.23</td><td>69.15</td></tr>
+        </tbody>
+      </table>
+
+      <p>
+        The small performance drops (1-2%) from the base Mistral model are typical of alignment training — the model trades some raw capability for improved conversational behavior. However, Zephyr retains much more of the base model's capabilities than Llama2-Chat, likely because the DPO training is less destructive than RLHF.
+      </p>
+
+      <!-- SECTION 3: Critical Ablations -->
+      <h2 class="title">Critical Ablations</h2>
+
+      <h3 class="subtitle">Finding 1: SFT Is Required Before DPO</h3>
+
+      <p>
+        The most important ablation demonstrates that DPO <strong>cannot</strong> be applied directly to the base model without an SFT stage:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>Configuration</th><th>MT-Bench</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Base (Mistral-7B)</td><td>4.76</td><td>No alignment</td></tr>
+          <tr><td>DPO only (no SFT)</td><td>4.76</td><td>DPO without SFT = no improvement!</td></tr>
+          <tr><td class="swi-win">dSFT → dDPO</td><td class="swi-win">7.34</td><td>Full pipeline works</td></tr>
+          <tr><td>dSFT only (no DPO)</td><td>7.00</td><td>SFT alone is strong</td></tr>
+        </tbody>
+      </table>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">⚠️</div>
+        <div class="swi-callout-body">
+          <strong>Critical finding:</strong> DPO applied directly to the base model (without SFT first) achieves the same MT-Bench score as the untrained base model (4.76). This means DPO alone cannot establish the behavioral foundation — SFT must come first. This is because the base model's response distribution is so different from the assistant-like distribution assumed by the preference data that DPO has nothing useful to learn. The SFT stage shifts the model's output distribution into the right "neighborhood" where DPO can then refine preferences.
+        </div>
+      </div>
+
+      <h3 class="subtitle">Finding 2: Overfitting Is Not Harmful</h3>
+
+      <p>
+        A surprising finding is that even when DPO overfits to the training preferences (100% training accuracy after 1 epoch), the model's quality on held-out benchmarks doesn't degrade:
+      </p>
+
+      <pre><code>DPO Training Progression:
+
+Epoch  Train Acc   MT-Bench   AlpacaEval
+──────────────────────────────────────────
+  0       —         7.00       75.2%
+  1      94%        7.28       88.1%
+  2      99%        7.31       89.7%
+  3     100%        7.34       90.6%  ← Best
+  5     100%        7.30       90.2%  ← No degradation!
+
+Key: Overfitting in preference space appears benign.
+The model learns the preference PATTERN, not
+specific training examples.</code></pre>
+
+      <p>
+        This is fundamentally different from overfitting in supervised learning. In DPO, "overfitting" means the model perfectly ranks chosen over rejected in the training set. But this preference pattern generalizes — the model learns a consistent behavioral template (prefer helpful, detailed, accurate responses) that applies to unseen prompts as well. The overfitting is in the <em>ranking function</em>, not in specific content.
+      </p>
+
+      <h3 class="subtitle">Finding 3: Optimal Training Schedule</h3>
+
+      <p>
+        The best performance comes from a specific combination of SFT and DPO epochs:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>SFT Epochs</th><th>DPO Epochs</th><th>MT-Bench</th><th>AlpacaEval</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>1</td><td>0</td><td>7.00</td><td>75.2%</td></tr>
+          <tr><td>1</td><td>1</td><td>7.28</td><td>88.1%</td></tr>
+          <tr><td class="swi-win">1</td><td class="swi-win">3</td><td class="swi-win">7.34</td><td class="swi-win">90.6%</td></tr>
+          <tr><td>1</td><td>5</td><td>7.30</td><td>90.2%</td></tr>
+          <tr><td>3</td><td>3</td><td>7.25</td><td>87.3%</td></tr>
+          <tr><td>5</td><td>3</td><td>7.18</td><td>84.6%</td></tr>
+        </tbody>
+      </table>
+
+      <p>
+        More SFT epochs actually <em>hurt</em> the final DPO performance, likely because the model overfits to the SFT data format and loses the flexibility that DPO needs to refine preferences. The sweet spot is 1 SFT epoch (enough to establish the behavioral template) followed by 3 DPO epochs (enough to refine preferences without overfitting to the training distribution).
+      </p>
+
+      <!-- SECTION 4: Training Details -->
+      <h2 class="title">Training Infrastructure</h2>
+
+      <p>
+        The entire Zephyr pipeline is remarkably efficient in terms of compute:
+      </p>
+
+      <pre><code>Training Infrastructure:
+
+Hardware:     16 × NVIDIA A100 80GB GPUs
+Framework:    TRL (Transformer Reinforcement Learning)
+Parallelism:  DeepSpeed ZeRO-3 (full parameter sharding)
+Attention:    FlashAttention-2 (memory-efficient attention)
+Precision:    BF16 mixed precision
+
+Stage 1 (dSFT):   ~2 hours
+Stage 2 (AIF):    ~6 hours (API calls, single machine)
+Stage 3 (dDPO):   ~2-4 hours
+──────────────────────────────────────
+Total:            ~10-12 hours (wall clock)
+Cost:             ~$100-200 in compute + ~$2,000 in API calls</code></pre>
+
+      <p>
+        The use of DeepSpeed ZeRO-3 shards model parameters, optimizer states, and gradients across all 16 GPUs, enabling the 7B model to train with very large batch sizes. FlashAttention-2 reduces memory usage for attention computation by 5-20×, allowing longer sequences and larger batches. Together, these optimizations make the entire pipeline accessible to teams with modest GPU resources.
+      </p>
+
+      <!-- SECTION 5: Comparison -->
+      <h2 class="title">Comparison with Existing Methods</h2>
+
+      <div class="swi-steps">
+        <div class="swi-step">
+          <div class="swi-step-number">1</div>
+          <div class="swi-step-content">
+            <h4>vs. Llama2-Chat (RLHF)</h4>
+            <p>Zephyr surpasses Llama2-Chat-70B on MT-Bench with 10× fewer parameters, using AI-only data vs. human annotation. This connects to [Paper 08] (LIMA), which shows that data quality matters more than scale.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">2</div>
+          <div class="swi-step-content">
+            <h4>vs. Mistral-Instruct (DPO)</h4>
+            <p>Zephyr surpasses the officially DPO-tuned Mistral variant, demonstrating that the dSFT + dDPO pipeline with AI feedback is more effective than standard DPO with human preferences.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">3</div>
+          <div class="swi-step-content">
+            <h4>vs. Guanaco (QLoRA)</h4>
+            <p>Both use QLoRA ([Paper 07]) for efficient training, but Zephyr adds the DPO stage for preference alignment, resulting in better conversational quality.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 6: Limitations -->
+      <h2 class="title">Limitations</h2>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">⚠️</div>
+        <div class="swi-callout-body">
+          <ul style="margin: 0; padding-left: 1.2rem;">
+            <li><strong>AI feedback ceiling:</strong> The model is trained on GPT-4 preferences, which may introduce GPT-4's biases and limitations. The model cannot exceed GPT-4's judgment quality.</li>
+            <li><strong>No human evaluation:</strong> All evaluation uses MT-Bench (GPT-4 scoring) and AlpacaEval (GPT-4 comparison). Human evaluation would provide a more reliable quality signal.</li>
+            <li><strong>Single base model:</strong> The pipeline is only tested with Mistral-7B. Generalization to other base models (LLaMA, Phi, etc.) is not demonstrated.</li>
+            <li><strong>API dependency:</strong> The AIF stage requires 256K GPT-4 API calls (~$2,000), which may be prohibitive for some teams. This connects to the cost analysis in [Paper 07] (QLoRA) about democratizing fine-tuning.</li>
+            <li><strong>No safety evaluation:</strong> The paper doesn't include safety benchmarks or red-teaming. The model's behavior on harmful prompts is unknown.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- SECTION 7: Practical Implications -->
+      <h2 class="title">Practical Implications</h2>
+
+      <p>
+        Zephyr established the SFT → DPO pipeline as the standard open-source alignment recipe. The key practical takeaways:
+      </p>
+
+      <ul>
+        <li><strong>SFT is prerequisite for DPO:</strong> This is the paper's most important practical finding. Never apply DPO directly to a base model — always do SFT first. This finding has been validated by the broader community and is now standard practice.</li>
+        <li><strong>AI feedback works:</strong> The fully automated pipeline (no human annotation) produces competitive results. This democratizes alignment — teams without access to human annotators can still train well-aligned models.</li>
+        <li><strong>1 epoch SFT, 3 epochs DPO:</strong> This training schedule is a good default for the SFT → DPO pipeline. More SFT epochs hurt; more DPO epochs don't help.</li>
+        <li><strong>Quality filtering matters:</strong> The 7:1 filtering of UltraChat (1.47M → 200K) is critical. Applying DPO to unfiltered data degrades performance.</li>
+        <li><strong>ORPO ([Paper 12]) builds on this:</strong> ORPO simplifies the Zephyr pipeline by merging SFT and DPO into a single stage, eliminating the need for a separate SFT phase and reference model.</li>
+      </ul>
+
+      <div class="swi-tags">
+        <span class="swi-tag">AI Feedback</span>
+        <span class="swi-tag">Distillation</span>
+        <span class="swi-tag">SFT → DPO Pipeline</span>
+        <span class="swi-tag">UltraChat</span>
+        <span class="swi-tag">UltraFeedback</span>
+        <span class="swi-tag">Fully Automated</span>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

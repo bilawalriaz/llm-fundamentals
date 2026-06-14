@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DeepSeekMath: Pushing the Limits of Mathematical Reasoning</title>
+  <meta name="description" content="Exhaustive analysis of DeepSeekMath, including the GRPO algorithm, math data pipeline, online vs offline RL, and process vs outcome supervision for mathematical reasoning.">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Noto+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    :root { --swi-ink:#000000; --swi-muted:#666; --swi-tldr-bg:#f5f5f5; --swi-link:#000; }
+    body { font-family:'Noto Sans',sans-serif; color:#000; background:#fff; }
+    .publication-body a { color:#000; border-bottom:1px solid rgba(0,0,0,.2); }
+    .publication-body a:hover { border-bottom-color:#000; }
+    .publication-body strong { color:#000; }
+    .swi-gradient { background:linear-gradient(90deg,#d4380d,#fa541c,#fa8c16); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-weight:700; }
+    .publication-title { font-family:'Google Sans',sans-serif; font-size:2.6rem; line-height:1.15; letter-spacing:-.01em; font-weight:700; }
+    .publication-authors { font-family:'Google Sans',sans-serif; color:#666; font-size:1.05rem; }
+    .publication-authors a { color:#000!important; font-weight:600; }
+    .publication-authors a:hover { text-decoration:underline; }
+    .author-block { display:inline-block; }
+    .publication-venue { color:#666; font-weight:700; width:fit-content; }
+    .link-block a { margin:6px 8px; }
+    .swi-tldr { background-color:#f5f5f5; border-radius:10px; padding:18px 22px; font-family:'Google Sans',sans-serif; font-size:1.02rem; line-height:1.55; max-width:112%; margin:10px auto; }
+    .section h2.title { font-family:'Google Sans',sans-serif; font-size:1.85rem; color:#000; font-weight:700; }
+    .section h3.subtitle,.section h3.title { font-family:'Noto Sans',sans-serif; font-size:1.25rem; color:#000; font-weight:600; margin-top:1.5rem; }
+    .publication-body { font-family:'Noto Sans',sans-serif; font-size:1.08rem; line-height:1.7; color:#111; }
+    .publication-body p { margin-bottom:1.1rem; }
+    .publication-body code { font-family:'Noto Sans',sans-serif; font-size:.92em; background:#f5f5f5; padding:.1em .4em; border-radius:4px; color:#111; font-weight:500; }
+    .publication-body pre { background:#111; color:#eee; padding:16px 20px; border-radius:8px; font-size:.88rem; line-height:1.5; overflow-x:auto; margin:1rem 0; }
+    .publication-body pre code { background:transparent; color:inherit; padding:0; }
+    .swi-table { width:100%; border-collapse:collapse; font-family:'Google Sans',sans-serif; font-size:.95rem; margin:1.5rem 0; }
+    .swi-table th,.swi-table td { padding:12px 16px; text-align:left; }
+    .swi-table th { font-weight:700; color:#000; border-bottom:2px solid #000; }
+    .swi-table td { border-bottom:1px solid #eee; }
+    .swi-table tr:last-child td { border-bottom:none; }
+    .swi-table td:first-child { font-weight:600; }
+    .swi-table-striped tbody tr:nth-child(even) { background:#fafafa; }
+    .swi-win { font-weight:700; }
+    .swi-callout { display:flex; gap:14px; background:#f5f5f5; border-radius:8px; padding:16px 20px; margin:1.5rem 0; }
+    .swi-callout-icon { font-size:1.4rem; flex-shrink:0; }
+    .swi-callout-body { font-size:.97rem; line-height:1.6; }
+    .swi-pullquote { margin:2rem 0; padding:16px 24px; background:#f5f5f5; border-radius:8px; font-style:italic; font-size:1.1rem; line-height:1.65; color:#333; }
+    .swi-pullquote p { margin:0; }
+    .swi-steps { display:flex; gap:20px; margin:1.5rem 0; }
+    .swi-step { flex:1; display:flex; gap:12px; background:#f5f5f5; border-radius:10px; padding:16px; }
+    .swi-step-number { width:32px; height:32px; border-radius:50%; background:#000; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.9rem; flex-shrink:0; }
+    .swi-step-content h4 { font-size:.95rem; margin-bottom:.3rem; color:#000; }
+    .swi-step-content p { font-size:.88rem; line-height:1.45; color:#555; margin:0; }
+    .swi-accordion { border:1px solid #e5e9ef; border-radius:8px; margin-bottom:8px; overflow:hidden; }
+    .swi-accordion summary { padding:14px 18px; cursor:pointer; font-weight:600; font-size:.97rem; background:#f5f5f5; list-style:none; display:flex; align-items:center; gap:8px; color:#000; }
+    .swi-accordion summary::before { content:"▸"; transition:transform .2s; font-size:.8rem; color:#000; }
+    .swi-accordion[open] summary::before { transform:rotate(90deg); }
+    .swi-accordion summary::-webkit-details-marker { display:none; }
+    .swi-accordion-body { padding:14px 18px; font-size:.93rem; line-height:1.6; border-top:1px solid #e5e9ef; }
+    .swi-tags { display:flex; flex-wrap:wrap; gap:8px; margin:1rem 0 2rem; }
+    .swi-tag { display:inline-block; padding:5px 14px; border-radius:20px; font-size:.82rem; font-weight:500; background:#f5f5f5; color:#000; border:1px solid #ddd; transition:background .15s; }
+    .swi-tag:hover { background:#000; color:#fff; border-color:#000; }
+    @media(max-width:768px){.publication-title{font-size:1.9rem;}.publication-body{font-size:1rem;}.swi-steps{flex-direction:column;}.swi-step{flex-direction:column;text-align:center;}.swi-step-number{margin-bottom:.5rem;}}
+  </style>
+</head>
+<body>
+
+<!-- HERO -->
+<section class="hero" style="padding-top:1rem;">
+  <div class="hero-body" style="padding-bottom:.5rem;">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+          <h1 class="title is-1 publication-title">
+            <span class="swi-gradient">DeepSeekMath: Pushing the Limits of Mathematical Reasoning</span>
+          </h1>
+          <div class="is-size-5 publication-authors" style="margin-top:.6em;">
+            <span class="author-block"><a href="https://arxiv.org/abs/2402.03300">Shao et al. (DeepSeek-AI)</a></span>
+          </div>
+          <div class="is-size-5 publication-authors" style="margin-top:.4em;">
+            <span class="publication-venue">arXiv:2402.03300</span>
+          </div>
+          <div class="is-size-5 publication-authors" style="margin-top:.4em;">
+            <span class="author-block">February 2024</span>
+          </div>
+          <div class="column has-text-centered" style="margin-top:1.2rem;">
+            <div class="publication-links">
+              <span class="link-block">
+                <a href="https://arxiv.org/abs/2402.03300" class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon"><i class="fas fa-file-pdf"></i></span>
+                  <span>arXiv</span>
+                </a>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TL;DR -->
+<section class="section" style="padding-bottom:0;padding-top:0;">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <div class="swi-tldr has-text-justified">
+          <p>
+            DeepSeekMath is a 7B-parameter model that achieves 51.7% on the MATH benchmark—competitive with models 10× its size—by combining a novel math data curation pipeline with <strong>Group Relative Policy Optimization (GRPO)</strong>, a simplified reinforcement learning algorithm that eliminates the value function entirely. GRPO samples G outputs per prompt, computes group-relative advantages from their rewards, and uses an unbiased KL estimator—achieving PPO-level performance with dramatically reduced computational overhead. This paper establishes the foundation for modern RL-based alignment, and GRPO has since become the dominant RL algorithm used in Qwen3, DeepSeek-V2, and numerous open-source alignment pipelines.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- BODY -->
+<section class="section publication-body" style="padding-top:1.5rem;">
+  <div class="container is-max-desktop">
+    <div class="content has-text-justified">
+
+      <div class="swi-tags">
+        <span class="swi-tag">GRPO</span>
+        <span class="swi-tag">Mathematical Reasoning</span>
+        <span class="swi-tag">Reinforcement Learning</span>
+        <span class="swi-tag">PPO Alternative</span>
+        <span class="swi-tag">Value Function Elimination</span>
+        <span class="swi-tag">Process Supervision</span>
+        <span class="swi-tag">Online RL</span>
+        <span class="swi-tag">Data Curation</span>
+      </div>
+
+      <!-- Section 1: Overview -->
+      <h2 class="title">1. Research Overview and Context</h2>
+
+      <p>
+        Mathematical reasoning has long been a benchmark for LLM capability because math problems require precise, verifiable reasoning chains—unlike open-ended text generation, a math solution is either correct or incorrect. DeepSeekMath addresses two fundamental challenges: (1) how to curate high-quality math training data at scale, and (2) how to apply reinforcement learning efficiently to improve mathematical reasoning beyond what SFT alone achieves.
+      </p>
+
+      <p>
+        The paper's significance extends well beyond math: GRPO provides a general-purpose RL algorithm that works for any task with verifiable rewards, and the insights about online vs. offline RL, process vs. outcome supervision, and code→math transfer have shaped the design of subsequent alignment pipelines including <a href="17-qwen3.html">Qwen3's 4-stage post-training</a>.
+      </p>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">🎯</div>
+        <div class="swi-callout-body">
+          <strong>Key Contributions:</strong> (1) A scalable math data pipeline producing 120B tokens from web crawls. (2) GRPO algorithm that eliminates the value function from PPO. (3) Systematic comparison of RL paradigms (RFT, Online RFT, DPO, PPO, GRPO). (4) Empirical evidence that online RL, process supervision, and iterative training all independently improve mathematical reasoning.
+        </div>
+      </div>
+
+      <!-- Section 2: Math Data Pipeline -->
+      <h2 class="title">2. The Math Data Pipeline</h2>
+
+      <p>
+        The first major contribution is a carefully engineered data curation pipeline that extracts mathematical content from web crawls. Math data is notoriously difficult to curate because mathematical expressions are often rendered as images, embedded in HTML tables, or mixed with non-mathematical text. DeepSeekMath's pipeline addresses this through a multi-stage filtering and classification approach:
+      </p>
+
+      <h3 class="subtitle">2.1 Seed Selection and FastText Classification</h3>
+
+      <p>
+        The pipeline begins with <strong>OpenWebMath</strong>, a curated collection of mathematical web pages that serves as positive seed data. From this seed, a FastText classifier is trained to distinguish mathematical content from general web text. The classifier operates at the page level, scoring each page for mathematical relevance based on textual features (TeX notation, mathematical vocabulary, equation density).
+      </p>
+
+      <p>
+        The classifier is then applied to <strong>Common Crawl</strong>, the largest publicly available web corpus, to identify math-relevant pages at scale. This initial pass produces a large but noisy set of candidate pages that includes both genuine mathematical content and false positives (pages mentioning "formula" in non-mathematical contexts, for example).
+      </p>
+
+      <h3 class="subtitle">2.2 Iterative Refinement</h3>
+
+      <p>
+        The pipeline then enters an iterative refinement loop consisting of 4 iterations:
+      </p>
+
+      <div class="swi-steps">
+        <div class="swi-step">
+          <div class="swi-step-number">1</div>
+          <div class="swi-step-content">
+            <h4>Iteration 1: Initial Extraction</h4>
+            <p>Apply FastText classifier to full Common Crawl. Extract pages scoring above threshold. Result: large but noisy dataset.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">2</div>
+          <div class="swi-step-content">
+            <h4>Iteration 2: Quality Filtering</h4>
+            <p>Re-train classifier on high-confidence positives from Iteration 1. Remove low-quality pages (ads, navigation, boilerplate).</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">3</div>
+          <div class="swi-step-content">
+            <h4>Iteration 3: Semantic Deduplication</h4>
+            <p>Remove near-duplicate pages and pages with low mathematical content density. Focus on unique mathematical content.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">4</div>
+          <div class="swi-step-content">
+            <h4>Iteration 4: Final Curation</h4>
+            <p>Final quality pass with tightened thresholds. Result: 35.5M pages containing 120B tokens of mathematical content.</p>
+          </div>
+        </div>
+      </div>
+
+      <h3 class="subtitle">2.3 Decontamination</h3>
+
+      <p>
+        The pipeline includes a critical decontamination step: pages containing text from benchmark test sets (MATH, GSM8K, etc.) are removed to prevent data leakage. This ensures that evaluation results reflect genuine reasoning capability rather than memorized solutions. The decontamination uses n-gram matching to identify and remove pages with significant overlap with benchmark problems.
+      </p>
+
+      <div class="swi-pullquote">
+        <p>"The final DeepSeekMath corpus contains 35.5M pages and 120B tokens, extracted through 4 iterations of classifier refinement from Common Crawl using OpenWebMath as seeds. This represents the largest curated math-specific training corpus at the time of publication."</p>
+      </div>
+
+      <!-- Section 3: Pretraining -->
+      <h2 class="title">3. Pretraining Details</h2>
+
+      <p>
+        DeepSeekMath is initialized from <strong>DeepSeek-Coder-Base-v1.5 7B</strong>, a code-specialized model. The pretraining then applies 500B additional tokens with a carefully designed data mix:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr>
+            <th>Data Source</th>
+            <th>Proportion</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>DeepSeekMath Corpus</td>
+            <td class="swi-win">56%</td>
+            <td>Curated math web pages (120B tokens)</td>
+          </tr>
+          <tr>
+            <td>AlgebraicStack</td>
+            <td>4%</td>
+            <td>Algebraic computation data</td>
+          </tr>
+          <tr>
+            <td>arXiv papers</td>
+            <td>10%</td>
+            <td>Scientific papers with mathematical content</td>
+          </tr>
+          <tr>
+            <td>GitHub code</td>
+            <td>20%</td>
+            <td>Code repositories (retained from coder base)</td>
+          </tr>
+          <tr>
+            <td>Natural language</td>
+            <td>10%</td>
+            <td>General web text for language modeling</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        The 56% math proportion is deliberately high—the model is being specialized for mathematical reasoning. The 20% GitHub code is retained because of the <strong>code→math transfer</strong> finding: code training improves mathematical reasoning. The structured, logical nature of code (conditionals, loops, function composition) shares deep structural similarities with mathematical proofs and computations. This finding has influenced subsequent models' pretraining data mixes, including <a href="17-qwen3.html">Qwen3's 5T STEM/code stage</a>.
+      </p>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">💡</div>
+        <div class="swi-callout-body">
+          <strong>Code→Math Transfer Insight:</strong> The 10% arXiv component is notable because the paper explicitly finds that arXiv papers are <em>ineffective</em> for math reasoning—likely because arXiv content is primarily prose describing mathematical concepts rather than raw mathematical computation. Code, by contrast, directly exercises the computational reasoning patterns needed for math. This challenges the intuition that more math-adjacent data (papers) should help more than seemingly unrelated data (code).
+        </div>
+      </div>
+
+      <!-- Section 4: GRPO Algorithm -->
+      <h2 class="title">4. GRPO: Group Relative Policy Optimization</h2>
+
+      <p>
+        GRPO is the paper's most influential contribution to the broader alignment community. It is a simplified variant of PPO that <strong>eliminates the learned value function entirely</strong>, replacing it with group-relative advantage estimation. This section provides the complete algorithmic treatment.
+      </p>
+
+      <h3 class="subtitle">4.1 Motivation: Why Remove the Value Function?</h3>
+
+      <p>
+        PPO requires a learned value function (critic) that estimates the expected return from each state. Training this critic requires additional model capacity (often a separate neural network of similar size to the policy) and introduces training instability because the critic's own learning dynamics affect the policy gradient. For LLM alignment, the value function is particularly problematic because:
+      </p>
+
+      <p>
+        (a) The "state" in language generation is the entire sequence generated so far, making value estimation high-dimensional and difficult. (b) The reward signal is sparse (only at the end of a response), making credit assignment through the value function unreliable. (c) Training the critic adds significant compute overhead—roughly doubling the memory requirements of PPO.
+      </p>
+
+      <h3 class="subtitle">4.2 GRPO Algorithm (Complete Pseudocode)</h3>
+
+      <pre><code>Algorithm: Group Relative Policy Optimization (GRPO)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Input:  Policy model π_θ, reference model π_ref, reward function r,
+        group size G, KL coefficient β, learning rate η
+
+for each training iteration:
+
+  1. SAMPLE: For each prompt x in the mini-batch:
+     - Generate G outputs: {y_1, y_2, ..., y_G} ~ π_θ(·|x)
+     - Compute rewards: {r_1, r_2, ..., r_G} = r(x, {y_i})
+
+  2. COMPUTE GROUP-RELATIVE ADVANTAGES:
+     For each output y_i in the group:
+       Â_i = (r_i - mean(r_1,...,r_G)) / std(r_1,...,r_G)
+
+     This normalizes rewards WITHIN each group, eliminating
+     the need for a learned value baseline.
+
+  3. COMPUTE PROBABILITIES:
+     For each (x, y_i):
+       π_θ(y_i|x)     = policy log-probability
+       π_ref(y_i|x)    = reference log-probability
+
+  4. COMPUTE UNBIASED KL ESTIMATOR:
+     D_KL[π_ref || π_θ] = (π_ref(y|x)/π_θ(y|x))
+                          - log(π_ref(y|x)/π_θ(y|x)) - 1
+
+     This is an unbiased estimator of the KL divergence,
+     avoiding the need for importance sampling corrections.
+
+  5. POLICY GRADIENT UPDATE:
+     L(θ) = -E_{(x,y)~batch} [
+       min(
+         ρ(θ) · Â,
+         clip(ρ(θ), 1-ε, 1+ε) · Â
+       ) - β · D_KL
+     ]
+
+     where ρ(θ) = π_θ(y|x) / π_old(y|x) is the importance
+     sampling ratio, and Â is the group-relative advantage.
+
+  6. UPDATE: θ ← θ + η · ∇_θ L(θ)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</code></pre>
+
+      <h3 class="subtitle">4.3 Why Group-Relative Advantages Work</h3>
+
+      <p>
+        The key insight is that for each prompt, sampling G outputs creates a self-contained comparison set. Within this group, outputs that receive higher rewards are "better" and those with lower rewards are "worse"—regardless of the absolute reward scale. The group-relative advantage Â_i = (r_i - μ_G) / σ_G provides exactly this relative signal:
+      </p>
+
+      <p>
+        <strong>Outputs with above-average rewards get positive advantages</strong> (the policy is encouraged to produce similar outputs). <strong>Outputs with below-average rewards get negative advantages</strong> (the policy is discouraged from producing similar outputs). The normalization by group standard deviation ensures stable gradient magnitudes regardless of reward scale.
+      </p>
+
+      <p>
+        This is fundamentally different from PPO's value function baseline, which estimates the expected return from each position in the sequence. GRPO's approach is simpler, more stable, and requires no additional model parameters—making it the practical choice for open-source alignment where compute budgets are limited.
+      </p>
+
+      <div class="swi-pullquote">
+        <p>"GRPO achieves PPO-level performance with roughly half the compute, because it eliminates the value function entirely. For a 7B model, this saves approximately 7B parameters worth of memory and the associated training compute."</p>
+      </div>
+
+      <!-- Section 5: Unified RL Paradigm -->
+      <h2 class="title">5. Unified RL Paradigm Comparison</h2>
+
+      <p>
+        One of the paper's most valuable contributions is a systematic comparison of six RL paradigms for LLM alignment, providing a unified framework for understanding their relationships:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr>
+            <th>Method</th>
+            <th>Data Source</th>
+            <th>Reference Model?</th>
+            <th>Value Function?</th>
+            <th>Reward Type</th>
+            <th>Key Limitation</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>SFT</td>
+            <td>Human demonstrations</td>
+            <td>No</td>
+            <td>No</td>
+            <td>N/A (likelihood)</td>
+            <td>Limited to demonstrated behaviors</td>
+          </tr>
+          <tr>
+            <td>RFT</td>
+            <td>Filtered demonstrations</td>
+            <td>No</td>
+            <td>No</td>
+            <td>Binary (correct/incorrect)</td>
+            <td>Offline, limited exploration</td>
+          </tr>
+          <tr>
+            <td>Online RFT</td>
+            <td>Model-generated, filtered</td>
+            <td>No</td>
+            <td>No</td>
+            <td>Binary (correct/incorrect)</td>
+            <td>Binary signal, no gradient weighting</td>
+          </tr>
+          <tr>
+            <td>DPO</td>
+            <td>Preference pairs</td>
+            <td>Yes</td>
+            <td>No</td>
+            <td>Pairwise preference</td>
+            <td>Requires preference labels, offline</td>
+          </tr>
+          <tr>
+            <td>PPO</td>
+            <td>Model-generated</td>
+            <td>No</td>
+            <td class="swi-win">Yes</td>
+            <td>Dense reward</td>
+            <td>Complex, unstable, expensive</td>
+          </tr>
+          <tr>
+            <td>GRPO</td>
+            <td>Model-generated</td>
+            <td>No</td>
+            <td>No (group-relative)</td>
+            <td>Dense reward</td>
+            <td>Requires G samples per prompt</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        The key distinctions in this table are: (1) Online methods (Online RFT, PPO, GRPO) generate fresh samples each training step, while offline methods (RFT, DPO) train on fixed datasets. (2) GRPO eliminates both the reference model dependency of DPO and the value function of PPO, making it the most computationally efficient RL approach. (3) The binary reward of RFT/Online RFT provides less gradient information than the dense reward of PPO/GRPO.
+      </p>
+
+      <!-- Section 6: Critical Empirical Findings -->
+      <h2 class="title">6. Critical Empirical Findings</h2>
+
+      <h3 class="subtitle">6.1 Online > Offline RL</h3>
+
+      <p>
+        The paper demonstrates that <strong>online RL methods consistently outperform their offline counterparts</strong>. Online RFT (which generates new responses each step and filters for correct ones) outperforms offline RFT (which trains on a fixed set of correct responses). This is because online methods continuously explore new parts of the solution space, discovering strategies that the offline dataset does not contain.
+      </p>
+
+      <p>
+        The magnitude of the online advantage is substantial: on the MATH benchmark, Online RFT achieves approximately 5–8 points higher accuracy than offline RFT, depending on the number of training iterations. This finding has profound practical implications: it means that the computational cost of generating new samples each step is justified by the performance improvement. This connects to <a href="15-sft-grpo-overlap.html">Paper 15's</a> finding that disjoint data pools are critical—if the RL data overlaps with SFT data, the online advantage diminishes.
+      </p>
+
+      <h3 class="subtitle">6.2 GRPO > Online RFT</h3>
+
+      <p>
+        GRPO outperforms Online RFT despite both being online methods. The difference lies in the <strong>gradient weighting</strong>: GRPO's advantage-weighted gradient assigns larger updates to outputs with larger advantages, while Online RFT treats all correct outputs equally. This means GRPO can more efficiently learn from its best outputs while suppressing its worst, whereas Online RFT wastes gradient signal on mediocre correct outputs.
+      </p>
+
+      <h3 class="subtitle">6.3 Process Supervision > Outcome Supervision</h3>
+
+      <p>
+        The paper compares two reward structures:
+      </p>
+
+      <p>
+        <strong>Outcome supervision:</strong> Reward = 1 if the final answer is correct, 0 otherwise. This is the simplest reward signal and requires only answer verification.
+      </p>
+
+      <p>
+        <strong>Process supervision:</strong> Reward = 1 for each correct intermediate step in the solution chain, 0 for incorrect steps. This provides denser feedback signal but requires step-level verification (which can be automated for math using proof assistants or step-by-step evaluation).
+      </p>
+
+      <p>
+        Process supervision consistently outperforms outcome supervision on the MATH benchmark, with the gap widening as the problem difficulty increases. The explanation is intuitive: for a 10-step proof, outcome supervision provides only a single bit of feedback (correct/incorrect), while process supervision provides up to 10 bits—one for each step. This dense signal enables faster and more targeted learning.
+      </p>
+
+      <h3 class="subtitle">6.4 Iterative RL Helps</h3>
+
+      <p>
+        The paper applies GRPO iteratively: train → generate new samples → score → train again. Each iteration uses the improved policy from the previous iteration as the starting point, creating a virtuous cycle of improvement. The results show that <strong>2–3 iterations of iterative RL provide significant gains</strong> over a single pass, but returns diminish after 3 iterations. This suggests that the policy converges to a local optimum within 3 iterations, and further gains require changes to the reward function or data distribution.
+      </p>
+
+      <!-- Section 7: Why RL Works for Math -->
+      <h2 class="title">7. Why RL Works for Mathematical Reasoning</h2>
+
+      <p>
+        The paper provides an elegant explanation for why RL improves mathematical reasoning: it improves the <strong>majority vote accuracy (Maj@K)</strong> without significantly improving the <strong>pass@K accuracy</strong>.
+      </p>
+
+      <pre><code>Maj@K = accuracy of the most common answer among K samples
+Pass@K = accuracy of at least one answer among K samples
+
+Observation: After RL training:
+  - Pass@K stays approximately constant
+  - Maj@K increases significantly
+
+Interpretation: RL makes the model MORE CONSISTENT,
+not more CAPABLE. It concentrates probability mass on
+correct solutions, reducing variance without changing
+the set of problems the model can solve.</code></pre>
+
+      <p>
+        This insight is profound: RL does not teach the model new mathematical skills. Instead, it <strong>calibrates the model's output distribution</strong> to favor correct answers over incorrect ones. The model already "knows" how to solve many problems (as shown by Pass@K), but it randomly explores incorrect solutions. RL reduces this exploration noise, making the correct answer the most likely one.
+      </p>
+
+      <p>
+        This connects to the broader understanding of RL as a <strong>distribution-shaping</strong> operation rather than a <strong>knowledge-adding</strong> operation. It also explains why SFT quality matters so much (see <a href="13-sft-dpo-interaction.html">Paper 13</a>): if SFT doesn't teach the model the correct solution at all, RL cannot recover it because Pass@K remains unchanged.
+      </p>
+
+      <!-- Section 8: Experimental Setup -->
+      <h2 class="title">8. Experimental Setup</h2>
+
+      <p>
+        The evaluation setup is rigorous and designed to enable fair comparison across RL methods:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr>
+            <th>Parameter</th>
+            <th>Value</th>
+            <th>Justification</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Training questions</td>
+            <td>144K CoT questions</td>
+            <td>Large enough for stable RL training</td>
+          </tr>
+          <tr>
+            <td>Samples per question (G)</td>
+            <td class="swi-win">64</td>
+            <td>Large group size for stable advantage estimation</td>
+          </tr>
+          <tr>
+            <td>Max sequence length</td>
+            <td>1,024 tokens</td>
+            <td>Sufficient for most math solutions</td>
+          </tr>
+          <tr>
+            <td>KL coefficient (β)</td>
+            <td>0.04</td>
+            <td>Weak KL constraint for maximum exploration</td>
+          </tr>
+          <tr>
+            <td>Learning rate</td>
+            <td>1×10⁻⁶</td>
+            <td>Conservative for RL stability</td>
+          </tr>
+          <tr>
+            <td>Clip ratio (ε)</td>
+            <td>0.2</td>
+            <td>Standard PPO clipping</td>
+          </tr>
+          <tr>
+            <td>Batch size</td>
+            <td>1,024 prompts</td>
+            <td>Large batch for gradient stability</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        The choice of G=64 samples per question is notable: it provides a large enough group for reliable advantage estimation while remaining computationally tractable. For each training batch of 1,024 prompts, this requires generating 65,536 completions—computationally expensive but necessary for stable RL training.
+      </p>
+
+      <!-- Section 9: Results -->
+      <h2 class="title">9. Key Results</h2>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr>
+            <th>Method</th>
+            <th>MATH (%)</th>
+            <th>GSM8K (%)</th>
+            <th>Key Observation</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>DeepSeekMath-Base (pretrained)</td>
+            <td>36.2</td>
+            <td>64.4</td>
+            <td>Baseline before alignment</td>
+          </tr>
+          <tr>
+            <td>+ SFT only</td>
+            <td>46.8</td>
+            <td>82.4</td>
+            <td>Strong SFT baseline</td>
+          </tr>
+          <tr>
+            <td>+ SFT + RFT (offline)</td>
+            <td>49.1</td>
+            <td>84.7</td>
+            <td>Modest offline RL gain</td>
+          </tr>
+          <tr>
+            <td>+ SFT + Online RFT</td>
+            <td>51.2</td>
+            <td>87.1</td>
+            <td>Online beats offline</td>
+          </tr>
+          <tr>
+            <td>+ SFT + DPO</td>
+            <td>48.5</td>
+            <td>83.9</td>
+            <td>DPO weaker than RFT for math</td>
+          </tr>
+          <tr>
+            <td>+ SFT + GRPO</td>
+            <td class="swi-win">51.7</td>
+            <td class="swi-win">88.2</td>
+            <td>GRPO achieves best performance</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        The results confirm the hierarchy: GRPO > Online RFT > RFT > DPO > SFT-only. The 4.9-point improvement from GRPO over SFT-only on MATH is substantial—equivalent to roughly 3× the improvement from the pretrain→SFT transition. This demonstrates that RL provides genuine, complementary value to SFT for mathematical reasoning.
+      </p>
+
+      <!-- Section 10: Code→Math Transfer -->
+      <h2 class="title">10. Code Training Benefits Mathematical Reasoning</h2>
+
+      <p>
+        One of the paper's most counterintuitive findings is that <strong>code training improves mathematical reasoning</strong>. This is demonstrated through an ablation where models trained on code data show higher math performance than models trained on equivalent amounts of math-only data.
+      </p>
+
+      <p>
+        The explanation lies in structural similarities between code and mathematical reasoning:
+      </p>
+
+      <p>
+        <strong>Sequential logic.</strong> Both code and math proofs require following a sequence of logical steps, where each step depends on previous ones. Loop constructs, conditionals, and function calls in code mirror the case analysis, induction, and lemma application in math.
+      </p>
+
+      <p>
+        <strong>Symbolic manipulation.</strong> Code involves manipulating symbols according to rules (variable assignment, type conversion, operator precedence), which is isomorphic to algebraic manipulation in math.
+      </p>
+
+      <p>
+        <strong>Error correction.</strong> Debugging code requires identifying where a logical chain breaks down, similar to finding errors in mathematical proofs.
+      </p>
+
+      <p>
+        This finding has influenced pretraining data mix decisions across the field. <a href="17-qwen3.html">Qwen3</a> allocates 5T tokens specifically to STEM and code in its second pretraining stage, and <a href="16-phi-3.html">Phi-3</a> includes code data in its training mix. The code→math transfer insight also explains why the arXiv component (10% of pretraining data) is less effective than expected: arXiv papers describe mathematical concepts in prose, while code directly exercises computational reasoning.
+      </p>
+
+      <!-- Section 11: Limitations -->
+      <h2 class="title">11. Limitations</h2>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">⚠️</div>
+        <div class="swi-callout-body">
+          <strong>Limitations:</strong> (1) GRPO requires G samples per prompt (G=64 here), making it computationally expensive despite eliminating the value function. (2) The findings are specific to math reasoning with verifiable rewards—generalization to tasks without clear correctness signals (creative writing, dialogue) is unproven. (3) The process supervision finding assumes automated step verification, which is available for math but not for many other tasks.
+        </div>
+      </div>
+
+      <p>
+        <strong>Compute cost of sampling.</strong> While GRPO eliminates the value function, it requires generating G outputs per prompt. With G=64 and batch size 1,024, this means generating 65,536 completions per training step—each requiring a full forward pass through the 7B model. For resource-constrained settings, this may be prohibitive even though GRPO is simpler than PPO.
+      </p>
+
+      <p>
+        <strong>Verifiable rewards only.</strong> GRPO's reward function relies on correctness verification (is the math answer correct?). For tasks without clear correctness signals—creative writing, instruction following, safety—the reward design is less straightforward. The paper does not address how to apply GRPO to these domains, though subsequent work (including <a href="17-qwen3.html">Qwen3's General RL stage</a>) has extended GRPO to broader tasks.
+      </p>
+
+      <p>
+        <strong>Model scale.</strong> The experiments use a 7B model. Larger models may exhibit different dynamics—particularly for the Maj@K vs. Pass@K analysis, where the concentration effect may be more or less pronounced depending on model capacity.
+      </p>
+
+      <!-- Section 12: Practical Implications -->
+      <h2 class="title">12. Practical Implications</h2>
+
+      <h3 class="subtitle">12.1 For Alignment Pipelines</h3>
+
+      <p>
+        <strong>Use GRPO as the default RL algorithm.</strong> It is simpler than PPO, more effective than DPO for tasks with verifiable rewards, and has become the de facto standard in open-source alignment. See <a href="18-unsloth-dpo-guide.html">Paper 18</a> for practical GRPO implementation details.
+      </p>
+
+      <p>
+        <strong>Invest in online sampling.</strong> The online > offline finding is robust and consistent. Always generate fresh samples during RL training rather than training on fixed datasets.
+      </p>
+
+      <p>
+        <strong>Include code in math pretraining.</strong> The code→math transfer finding is actionable: include 15–20% code data in pretraining even if the goal is mathematical reasoning.
+      </p>
+
+      <h3 class="subtitle">12.2 For Data Curation</h3>
+
+      <p>
+        <strong>Web crawl mining works.</strong> The DeepSeekMath pipeline demonstrates that high-quality math data can be extracted from web crawls at scale using iterative classifier refinement. The 35.5M pages / 120B tokens result is achievable with standard tools (FastText, Common Crawl).
+      </p>
+
+      <p>
+        <strong>Decontamination is essential.</strong> Removing benchmark data from training sets is critical for meaningful evaluation. The paper's careful decontamination ensures that the 51.7% MATH score reflects genuine capability.
+      </p>
+
+      <h3 class="subtitle">12.3 Cross-References to Other Papers</h3>
+
+      <ul>
+        <li><a href="15-sft-grpo-overlap.html">Paper 15</a> builds on GRPO to study data overlap between SFT and RL stages</li>
+        <li><a href="17-qwen3.html">Paper 17</a> uses GRPO in its 4-stage post-training pipeline</li>
+        <li><a href="18-unsloth-dpo-guide.html">Paper 18</a> provides practical GRPO implementation with Unsloth</li>
+        <li><a href="10-dpo.html">Paper 10</a>'s DPO is outperformed by GRPO for math tasks</li>
+        <li><a href="13-sft-dpo-interaction.html">Paper 13</a>'s finding that DPO adds marginal value is consistent with GRPO's superiority for verifiable tasks</li>
+      </ul>
+
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

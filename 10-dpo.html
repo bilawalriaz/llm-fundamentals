@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Direct Preference Optimization (DPO): Your Language Model Is Secretly a Reward Model</title>
+  <meta name="description" content="Replace the complex RLHF pipeline with a simple binary cross-entropy loss — the mathematical insight that makes alignment training accessible to everyone.">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Noto+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --swi-ink:    #000000;
+      --swi-muted:  #666;
+      --swi-tldr-bg:#f5f5f5;
+      --swi-link:   #000;
+    }
+
+    body {
+      font-family: 'Noto Sans', sans-serif;
+      color: #000;
+      background: #ffffff;
+    }
+
+    .publication-body a {
+      color: #000;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+    }
+    .publication-body a:hover { border-bottom-color: #000; }
+    .publication-body strong { color: #000; }
+
+    .swi-gradient {
+      background: linear-gradient(90deg, #d4380d, #fa541c, #fa8c16);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-weight: bold;
+    }
+
+    .publication-title {
+      font-family: 'Google Sans', sans-serif;
+      font-size: 2.6rem;
+      line-height: 1.15;
+      letter-spacing: -0.01em;
+      font-weight: 700;
+    }
+    .publication-authors {
+      font-family: 'Google Sans', sans-serif;
+      color: #666;
+      font-size: 1.05rem;
+    }
+    .publication-authors a {
+      color: #000 !important;
+      font-weight: 600;
+    }
+    .publication-authors a:hover { text-decoration: underline; }
+    .author-block { display: inline-block; }
+    .publication-venue {
+      color: #666;
+      font-weight: bold;
+      width: fit-content;
+    }
+
+    .link-block a { margin: 6px 8px; }
+
+    .swi-tldr {
+      background-color: #f5f5f5;
+      border-radius: 10px;
+      padding: 18px 22px;
+      font-family: 'Google Sans', sans-serif;
+      font-size: 1.02rem;
+      line-height: 1.55;
+      max-width: 112%;
+      margin: 10px auto;
+    }
+
+    .swi-caption {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      max-width: 97%;
+      margin: 0.4em auto 0 auto;
+      color: #333;
+    }
+
+    .section h2.title {
+      font-family: 'Google Sans', sans-serif;
+      font-size: 1.85rem;
+      color: #000;
+      font-weight: 700;
+    }
+    .section h3.subtitle,
+    .section h3.title {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 1.25rem;
+      color: #000;
+      font-weight: 600;
+      margin-top: 1.5rem;
+    }
+
+    .publication-body {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 1.08rem;
+      line-height: 1.7;
+      color: #111;
+    }
+    .publication-body p { margin-bottom: 1.1rem; }
+    .publication-body code {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 0.92em;
+      background: #f5f5f5;
+      padding: 0.1em 0.4em;
+      border-radius: 4px;
+      color: #111;
+      font-weight: 500;
+    }
+    .publication-body pre {
+      background: #111;
+      color: #eee;
+      padding: 16px 20px;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
+    .publication-body pre code {
+      background: transparent;
+      color: inherit;
+      padding: 0;
+    }
+
+    .swi-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: 'Google Sans', sans-serif;
+      font-size: 0.95rem;
+      margin: 1.5rem 0;
+    }
+    .swi-table th, .swi-table td {
+      padding: 12px 16px;
+      text-align: left;
+    }
+    .swi-table th {
+      font-weight: 700;
+      color: #000;
+      border-bottom: 2px solid #000;
+    }
+    .swi-table td {
+      border-bottom: 1px solid #eee;
+    }
+    .swi-table tr:last-child td { border-bottom: none; }
+    .swi-table td:first-child { font-weight: 600; }
+    .swi-table-striped tbody tr:nth-child(even) { background: #fafafa; }
+
+    .swi-win { font-weight: 700; }
+
+    .swi-paginate {
+      border-top: 1px solid #e5e9ef;
+      margin-top: 3rem;
+      padding-top: 1.5rem;
+      font-family: 'Google Sans', sans-serif;
+      font-size: 0.95rem;
+    }
+    .swi-paginate a { color: #000; }
+
+    .swi-callout {
+      display: flex;
+      gap: 14px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin: 1.5rem 0;
+    }
+    .swi-callout-icon { font-size: 1.4rem; flex-shrink: 0; }
+    .swi-callout-body { font-size: 0.97rem; line-height: 1.6; }
+
+    .swi-pullquote {
+      margin: 2rem 0;
+      padding: 16px 24px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      font-style: italic;
+      font-size: 1.1rem;
+      line-height: 1.65;
+      color: #333;
+    }
+    .swi-pullquote p { margin: 0; }
+
+    .swi-steps {
+      display: flex;
+      gap: 20px;
+      margin: 1.5rem 0;
+    }
+    .swi-step {
+      flex: 1;
+      display: flex;
+      gap: 12px;
+      background: #f5f5f5;
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .swi-step-number {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #000;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+      flex-shrink: 0;
+    }
+    .swi-step-content h4 {
+      font-size: 0.95rem;
+      margin-bottom: 0.3rem;
+      color: #000;
+    }
+    .swi-step-content p {
+      font-size: 0.88rem;
+      line-height: 1.45;
+      color: #555;
+      margin: 0;
+    }
+
+    .swi-image-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 1.5rem 0;
+    }
+    .swi-figure { margin: 0; }
+    .swi-image-placeholder {
+      background: #f0f0f0;
+      border-radius: 10px;
+      aspect-ratio: 4/3;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      color: #999;
+      font-size: 0.85rem;
+      border: 2px dashed #ddd;
+    }
+    .swi-image-icon { font-size: 1.6rem; }
+    .swi-figure figcaption {
+      font-size: 0.82rem;
+      color: #777;
+      margin-top: 6px;
+      text-align: center;
+    }
+
+    .swi-accordion {
+      border: 1px solid #e5e9ef;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      overflow: hidden;
+    }
+    .swi-accordion summary {
+      padding: 14px 18px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.97rem;
+      background: #f5f5f5;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #000;
+    }
+    .swi-accordion summary::before {
+      content: "▸";
+      transition: transform 0.2s;
+      font-size: 0.8rem;
+      color: #000;
+    }
+    .swi-accordion[open] summary::before { transform: rotate(90deg); }
+    .swi-accordion summary::-webkit-details-marker { display: none; }
+    .swi-accordion-body {
+      padding: 14px 18px;
+      font-size: 0.93rem;
+      line-height: 1.6;
+      border-top: 1px solid #e5e9ef;
+    }
+
+    .swi-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 1rem 0 2rem;
+    }
+    .swi-tag {
+      display: inline-block;
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      background: #f5f5f5;
+      color: #000;
+      border: 1px solid #ddd;
+      transition: background 0.15s;
+    }
+    .swi-tag:hover { background: #000; color: #fff; border-color: #000; }
+
+    .swi-author-card {
+      display: flex;
+      gap: 18px;
+      align-items: center;
+      background: #f5f5f5;
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin: 2rem 0;
+    }
+    .swi-author-avatar {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: #000;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 1.1rem;
+      flex-shrink: 0;
+    }
+    .swi-author-info h4 { margin: 0 0 0.3rem; font-size: 1rem; }
+    .swi-author-info h4 a { color: #000; text-decoration: none; font-weight: 600; }
+    .swi-author-info h4 a:hover { text-decoration: underline; }
+    .swi-author-info p { margin: 0; font-size: 0.9rem; color: #666; }
+
+    .swi-related-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 1rem 0 2rem;
+    }
+    .swi-related-card {
+      display: block;
+      padding: 18px 20px;
+      background: #f5f5f5;
+      border-radius: 10px;
+      text-decoration: none;
+      border: 1px solid transparent;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .swi-related-card:hover {
+      border-color: #000;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    }
+    .swi-related-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #888;
+      font-weight: 600;
+    }
+    .swi-related-card h3 {
+      margin: 6px 0 0;
+      font-size: 0.95rem;
+      color: #000;
+      line-height: 1.4;
+      font-weight: 600;
+    }
+
+    @media (max-width: 768px) {
+      .publication-title { font-size: 1.9rem; }
+      .publication-body { font-size: 1rem; }
+      .swi-steps { flex-direction: column; }
+      .swi-step { flex-direction: column; text-align: center; }
+      .swi-step-number { margin-bottom: 0.5rem; }
+      .swi-image-grid { grid-template-columns: 1fr; }
+      .swi-related-grid { grid-template-columns: 1fr; }
+      .swi-author-card { flex-direction: column; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- HERO -->
+<section class="hero" style="padding-top: 1rem;">
+  <div class="hero-body" style="padding-bottom: 0.5rem;">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+          <h1 class="title is-1 publication-title">
+            <span class="swi-gradient">Direct Preference Optimization (DPO)</span>
+          </h1>
+
+          <div class="is-size-5 publication-authors" style="margin-top: 0.6em;">
+            <span class="author-block"><a href="https://arxiv.org/abs/2305.18290">Rafailov et al. (Stanford)</a></span>
+          </div>
+
+          <div class="is-size-5 publication-authors" style="margin-top: 0.4em;">
+            <span class="publication-venue">arXiv:2305.18290</span>
+          </div>
+
+          <div class="is-size-5 publication-authors" style="margin-top: 0.4em;">
+            <span class="author-block">May 2023</span>
+          </div>
+
+          <div class="column has-text-centered" style="margin-top: 1.2rem;">
+            <div class="publication-links">
+              <span class="link-block">
+                <a href="https://arxiv.org/abs/2305.18290"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon"><i class="fas fa-file-pdf"></i></span>
+                  <span>Paper</span>
+                </a>
+              </span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ABSTRACT (TL;DR) -->
+<section class="section" style="padding-bottom: 0; padding-top: 0;">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <div class="swi-tldr has-text-justified">
+          <p>
+            DPO replaces the complex RLHF pipeline (reward model training → PPO optimization) with a simple binary classification loss on preference pairs. The key insight is that the optimal policy under KL-constrained reward maximization has a closed-form solution, and the intractable partition function cancels out when substituted into the Bradley-Terry preference model. The resulting loss is a simple sigmoid function on the log-ratio of chosen vs. rejected responses, weighted by the reference policy. DPO matches or exceeds PPO on summarization and dialogue benchmarks while being dramatically simpler to implement and more stable to train.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- BODY -->
+<section class="section publication-body" style="padding-top: 1.5rem;">
+  <div class="container is-max-desktop">
+    <div class="content has-text-justified">
+
+      <!-- SECTION 1: The RLHF Problem -->
+      <h2 class="title">The RLHF Problem: Why We Need DPO</h2>
+
+      <p>
+        Reinforcement Learning from Human Feedback (RLHF) was the dominant alignment paradigm before DPO. The standard RLHF pipeline involves three separate stages:
+      </p>
+
+      <div class="swi-steps">
+        <div class="swi-step">
+          <div class="swi-step-number">1</div>
+          <div class="swi-step-content">
+            <h4>Supervised Fine-Tuning (SFT)</h4>
+            <p>Train the base model on high-quality instruction-response pairs to establish a baseline behavioral pattern. This produces π<sub>SFT</sub>.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">2</div>
+          <div class="swi-step-content">
+            <h4>Reward Model Training</h4>
+            <p>Collect human preferences over model outputs, train a reward model r(x,y) that predicts human preference scores. This is a separate neural network.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">3</div>
+          <div class="swi-step-content">
+            <h4>PPO Optimization</h4>
+            <p>Use Proximal Policy Optimization to maximize the reward model's score while keeping the policy close to π<sub>SFT</sub> via a KL penalty. Requires four models in memory.</p>
+          </div>
+        </div>
+      </div>
+
+      <p>
+        Each stage introduces complexity, instability, and potential failure modes. The PPO stage in particular is notoriously difficult to tune — it requires balancing the reward maximization objective against the KL penalty, managing the value function baseline, handling rollout buffers, and dealing with the notorious "reward hacking" problem where the policy exploits the reward model rather than genuinely improving.
+      </p>
+
+      <h3 class="subtitle">The KL-Constrained Objective</h3>
+
+      <p>
+        The RLHF objective is to find a policy π<sub>θ</sub> that maximizes the expected reward while staying close to a reference policy π<sub>ref</sub> (typically π<sub>SFT</sub>):
+      </p>
+
+      <pre><code>maximize  E_{x~D, y~π_θ(y|x)} [r(x, y)] - β · D_KL[π_θ(y|x) || π_ref(y|x)]
+
+Where:
+  r(x, y):        Reward model score for prompt x, response y
+  π_ref:           Reference policy (SFT model)
+  β:               KL penalty coefficient (controls reward/diversity tradeoff)
+  D_KL:            KL divergence between current and reference policy
+
+This is equivalent to:
+  maximize  E_{x~D, y~π_θ(y|x)} [r(x, y) - β · log(π_θ(y|x) / π_ref(y|x))]</code></pre>
+
+      <p>
+        The KL term prevents the policy from diverging too far from the reference, which would cause mode collapse (generating the same high-reward response for every prompt) or degradation of language quality. The coefficient β controls the tradeoff: higher β means more conservative updates (closer to reference), lower β means more aggressive reward maximization.
+      </p>
+
+      <!-- SECTION 2: The Key Insight -->
+      <h2 class="title">The Key Mathematical Insight</h2>
+
+      <p>
+        DPO's breakthrough is showing that the optimal policy for the KL-constrained objective has a closed-form solution, and this solution can be inverted to express the reward function in terms of the optimal policy:
+      </p>
+
+      <h3 class="subtitle">Step 1: Optimal Policy</h3>
+
+      <pre><code>The optimal policy π* for the KL-constrained objective is:
+
+  π*(y|x) = (1/Z(x)) · π_ref(y|x) · exp(r(x,y) / β)
+
+Where Z(x) = Σ_y π_ref(y|x) · exp(r(x,y) / β) is the partition function.
+
+This is a Gibbs distribution: the optimal policy reweights
+the reference policy by the exponential of the reward.</code></pre>
+
+      <h3 class="subtitle">Step 2: Reward Reparameterization</h3>
+
+      <pre><code>Solving for r(x,y):
+
+  r(x, y) = β · log(π*(y|x) / π_ref(y|x)) + β · log Z(x)
+
+Key insight: The reward is expressed as a LOG-RATIO
+of the optimal policy to the reference policy,
+plus a prompt-dependent constant β·log Z(x).</code></pre>
+
+      <h3 class="subtitle">Step 3: Substitution into Bradley-Terry</h3>
+
+      <pre><code>The Bradley-Terry preference model:
+
+  P(y_w ≻ y_l | x) = σ(r(x, y_w) - r(x, y_l))
+
+Substituting the reparameterized reward:
+
+  P(y_w ≻ y_l | x) = σ(β·log(π*(y_w|x)/π_ref(y_w|x)) 
+                        + β·log Z(x) 
+                        - β·log(π*(y_l|x)/π_ref(y_l|x))
+                        - β·log Z(x))
+
+The partition function Z(x) CANCELS OUT!
+
+  P(y_w ≻ y_l | x) = σ(β·[log(π*(y_w|x)/π_ref(y_w|x))
+                          - log(π*(y_l|x)/π_ref(y_l|x))])</code></pre>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">🔑</div>
+        <div class="swi-callout-body">
+          <strong>The cancellation of Z(x) is the entire trick.</strong> The partition function Z(x) is intractable to compute (it requires summing over all possible responses y). But because it appears identically in both the chosen and rejected terms, it cancels in the difference. This means we never need to compute it — the preference probability depends only on the ratio of policies, not on the absolute reward values.
+        </div>
+      </div>
+
+      <h3 class="subtitle">Step 4: The DPO Loss</h3>
+
+      <pre><code>DPO Loss:
+
+  L_DPO(π_θ; π_ref) = -E_{(x, y_w, y_l)~D} [
+    log σ(β · [log(π_θ(y_w|x) / π_ref(y_w|x))
+              - log(π_θ(y_l|x) / π_ref(y_l|x))])
+  ]
+
+Where:
+  (x, y_w, y_l):  Prompt, chosen response, rejected response
+  π_θ:             Policy being trained
+  π_ref:           Reference policy (frozen)
+  σ:               Sigmoid function
+  β:               Temperature parameter
+
+This is just binary cross-entropy on preference pairs!</code></pre>
+
+      <p>
+        The DPO loss is elegant in its simplicity. It requires only two forward passes per training step (one for the chosen response, one for the rejected), compared to PPO's four (policy, reference, reward model, value function). There is no reward model to train, no rollout buffer to manage, no GAE to compute, and no clipping to tune.
+      </p>
+
+      <!-- SECTION 3: Gradient Analysis -->
+      <h2 class="title">Gradient Analysis: Why DPO Works</h2>
+
+      <p>
+        The gradient of the DPO loss reveals why it's well-behaved:
+      </p>
+
+      <pre><code>∇_θ L_DPO = -β · E [
+  σ(r̂(x, y_l) - r̂(x, y_w)) · [
+    ∇_θ log π_θ(y_w|x) - ∇_θ log π_θ(y_l|x)
+  ]
+]
+
+Where r̂(x,y) = β · log(π_θ(y|x)/π_ref(y|x)) is the
+implicit reward under the current policy.</code></pre>
+
+      <h3 class="subtitle">Dynamic Weighting</h3>
+
+      <p>
+        The term σ(r̂(x, y<sub>l</sub>) - r̂(x, y<sub>w</sub>)) acts as an automatic, dynamic weight on each training example:
+      </p>
+
+      <ul>
+        <li><strong>When the model already ranks correctly</strong> (r̂(y<sub>w</sub>) >> r̂(y<sub>l</sub>)): The sigmoid is near 0, and the gradient is small. The model doesn't waste capacity on examples it already gets right.</li>
+        <li><strong>When the model ranks incorrectly</strong> (r̂(y<sub>w</sub>) &lt; r̂(y<sub>l</sub>)): The sigmoid is near 1, and the gradient is large. The model focuses on examples where it's wrong.</li>
+        <li><strong>When the model is uncertain</strong> (r̂(y<sub>w</sub>) ≈ r̂(y<sub>l</sub>)): The sigmoid is near 0.5, and the gradient has moderate magnitude.</li>
+      </ul>
+
+      <p>
+        This dynamic weighting is a natural curriculum that focuses training on the hardest examples — those where the model's implicit reward ranking disagrees with the human preference. This is similar to hard example mining in computer vision, but it emerges automatically from the loss function rather than requiring explicit selection.
+      </p>
+
+      <!-- SECTION 4: Theoretical Properties -->
+      <h2 class="title">Theoretical Properties: Equivalence Classes</h2>
+
+      <p>
+        The paper proves several important theoretical results about the relationship between reward models, policies, and preference distributions:
+      </p>
+
+      <details class="swi-accordion">
+        <summary>Lemma 1: Equivalence of Preference Distributions</summary>
+        <div class="swi-accordion-body">
+          <p>Two reward functions r and r' yield the same preference distribution under the Bradley-Terry model if and only if r(x,y) - r'(x,y) = f(x) for some function f that depends only on the prompt x. In other words, adding a prompt-dependent constant to the reward doesn't change preferences — only the relative reward between responses matters.</p>
+        </div>
+      </details>
+
+      <details class="swi-accordion">
+        <summary>Lemma 2: Equivalence of Optimal Policies</summary>
+        <div class="swi-accordion-body">
+          <p>If two reward functions are equivalent (differ by a prompt-dependent constant), they produce the same optimal policy under the KL-constrained objective. This means the reward model doesn't need to capture absolute values — only relative ordering between responses for the same prompt.</p>
+        </div>
+      </details>
+
+      <details class="swi-accordion">
+        <summary>Theorem 1: Plackett-Luce Representability</summary>
+        <div class="swi-accordion-body">
+          <p>Under mild assumptions, the DPO objective can represent any preference distribution that is expressible by the Plackett-Luce family (which includes Bradley-Terry as a special case). This means DPO is not losing representational power by eliminating the explicit reward model — the implicit reward captured by the policy ratio is sufficient to model all preferences expressible by the standard reward-based framework.</p>
+        </div>
+      </details>
+
+      <!-- SECTION 5: Comparison with PPO -->
+      <h2 class="title">DPO vs. PPO: Head-to-Head</h2>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>Aspect</th><th>PPO (RLHF)</th><th>DPO</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Requires reward model</td><td>Yes (separate training)</td><td class="swi-win">No</td></tr>
+          <tr><td>Training stability</td><td>Often unstable (hyperparameter sensitive)</td><td class="swi-win">Stable (classification loss)</td></tr>
+          <tr><td>Hyperparameters</td><td>Many (GAE λ, clip ratio, lr, KL coeff, value loss coeff, ...)</td><td class="swi-win">Few (primarily β)</td></tr>
+          <tr><td>Forward passes per step</td><td>4 (policy, ref, reward, value)</td><td class="swi-win">2 (policy, ref)</td></tr>
+          <tr><td>Memory overhead</td><td>High (value head, rollout buffer, reward model)</td><td class="swi-win">Low</td></tr>
+          <tr><td>Reward hacking</td><td>Common failure mode</td><td class="swi-win">Eliminated</td></tr>
+          <tr><td>Mode collapse</td><td>Possible with aggressive optimization</td><td class="swi-win">Rare</td></tr>
+          <tr><td>Needs experience replay</td><td>Yes</td><td class="swi-win">No</td></tr>
+        </tbody>
+      </table>
+
+      <!-- SECTION 6: Experimental Results -->
+      <h2 class="title">Experimental Results</h2>
+
+      <h3 class="subtitle">IMDb Sentiment Control</h3>
+
+      <p>
+        The authors evaluate DPO on a sentiment steering task, where the model must generate movie reviews with positive sentiment. The reward-KL frontier shows DPO achieving better reward at every level of KL divergence:
+      </p>
+
+      <pre><code>IMDb Sentiment: Reward vs. KL Frontier
+
+Method              Reward (↑)    KL (↓)
+──────────────────────────────────────────
+PPO                 0.68          5.2
+PPO with GT reward  0.72          4.8
+Best-of-N (N=128)   0.74          6.1
+DPO (β=0.1)         0.76          3.9  ← Best frontier
+DPO (β=0.5)         0.71          2.8
+
+DPO dominates the reward-KL frontier at all
+KL levels, achieving higher reward with
+less divergence from the reference.</code></pre>
+
+      <h3 class="subtitle">TL;DR Summarization</h3>
+
+      <p>
+        On the Reddit TL;DR summarization task, DPO outperforms PPO in human preference win rates:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>Method</th><th>Win Rate vs. Reference</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>SFT (reference)</td><td>50% (baseline)</td><td>Standard supervised fine-tuning</td></tr>
+          <tr><td>PPO</td><td>57%</td><td>Standard RLHF</td></tr>
+          <tr><td>PPO with GT reward</td><td>59%</td><td>Upper bound with true reward</td></tr>
+          <tr><td class="swi-win">DPO</td><td class="swi-win">61%</td><td>Surpasses PPO with ground truth reward!</td></tr>
+        </tbody>
+      </table>
+
+      <p>
+        Remarkably, DPO <em>surpasses PPO with ground-truth reward</em>. This suggests that PPO's optimization challenges (instability, reward hacking) prevent it from fully exploiting even a perfect reward signal, while DPO's simpler objective avoids these failure modes.
+      </p>
+
+      <h3 class="subtitle">Anthropic HH (Helpfulness &amp; Harmlessness)</h3>
+
+      <p>
+        On the Anthropic helpful and harmless dialogue dataset:
+      </p>
+
+      <pre><code>Anthropic HH: Win Rate vs. SFT Reference
+
+Method              Helpfulness    Harmlessness
+─────────────────────────────────────────────────
+PPO                 52%            54%
+Best-of-N (N=128)   56%            57%
+DPO                 57%            58%  ← Best on both</code></pre>
+
+      <!-- SECTION 7: β Sensitivity -->
+      <h2 class="title">The β Parameter</h2>
+
+      <p>
+        β is the most important hyperparameter in DPO. It controls the strength of the implicit KL penalty against the reference model:
+      </p>
+
+      <pre><code>β = 0.1:  Strong penalty → policy stays close to reference
+           Generates diverse but conservative responses
+           Less reward hacking, but may under-optimize
+
+β = 0.5:  Moderate penalty → balanced reward/diversity
+           Good default for most tasks
+
+β = 1.0:  Weak penalty → policy can diverge significantly
+           Higher reward but risk of degraded quality
+           More reward hacking possible</code></pre>
+
+      <p>
+        The authors recommend β = 0.1 as a starting point for most tasks, with β = 0.5 as an alternative when more diversity is desired. Unlike PPO's multiple hyperparameters (clip ratio, GAE lambda, value loss coefficient, learning rate, etc.), DPO's β is the only parameter that requires tuning, making it far more practical for practitioners.
+      </p>
+
+      <!-- SECTION 8: Connection to Control-as-Inference -->
+      <h2 class="title">Connection to Control-as-Inference</h2>
+
+      <p>
+        The paper draws a connection between DPO and the control-as-inference framework. In PPO, the policy gradient includes a normalization term (the value function baseline) that is notoriously difficult to estimate accurately. Poor baseline estimates lead to high-variance gradients and unstable training. DPO avoids this entirely because the preference loss is a supervised classification objective — there is no baseline to estimate, and the gradient variance is naturally low.
+      </p>
+
+      <div class="swi-pullquote">
+        <p>"The partition function Z(x) in the DPO objective plays the same role as the value function baseline in PPO — but it cancels out analytically. This is why DPO is more stable: the normalization that PPO must estimate empirically, DPO handles exactly through its mathematical structure."</p>
+      </div>
+
+      <!-- SECTION 9: Limitations -->
+      <h2 class="title">Limitations</h2>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">⚠️</div>
+        <div class="swi-callout-body">
+          <ul style="margin: 0; padding-left: 1.2rem;">
+            <li><strong>Requires reference model in memory:</strong> DPO needs π<sub>ref</sub> during training, doubling the memory for model weights compared to training from scratch. QLoRA ([Paper 07]) mitigates this by quantizing the base model.</li>
+            <li><strong>Online vs. offline:</strong> DPO is typically applied offline (on a fixed dataset of preferences), while PPO can learn online from its own rollouts. This limits DPO's ability to explore new parts of the response space.</li>
+            <li><strong>Preference dataset quality:</strong> DPO is only as good as its preference data. Noisy or inconsistent preferences directly degrade the learned policy. This connects to [Paper 08] (LIMA), which emphasizes data quality.</li>
+            <li><strong>β sensitivity:</strong> While simpler than PPO's hyperparameters, β still requires tuning. Too low and the policy over-optimizes; too high and it under-optimizes.</li>
+            <li><strong>No reward model for deployment:</strong> The implicit reward captured by the policy ratio cannot be used for scoring new responses outside the training distribution, unlike an explicit reward model.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- SECTION 10: Practical Implications -->
+      <h2 class="title">Practical Implications and Legacy</h2>
+
+      <p>
+        DPO has become the dominant alignment method for open-source models. Its simplicity (a classification loss on preference pairs) makes it accessible to teams without RL expertise. The key practical implications:
+      </p>
+
+      <ul>
+        <li><strong>Zephyr ([Paper 11]):</strong> Used DPO as the final alignment stage (dDPO), demonstrating that DPO works well with AI-generated preferences and LoRA adapters. The SFT → DPO pipeline it popularized is now the standard open-source alignment recipe.</li>
+        <li><strong>ORPO ([Paper 12]):</strong> ORPO extends DPO by merging the SFT loss into the preference loss, eliminating the need for a separate SFT stage and reference model. This is a direct evolution of DPO's mathematical framework.</li>
+        <li><strong>LoRA compatibility:</strong> DPO with LoRA (or QLoRA) is the default training mode for most open-source alignment pipelines. The 2 forward passes required by DPO pair naturally with LoRA's memory efficiency.</li>
+        <li><strong>Data requirements:</strong> DPO typically requires 10K-100K preference pairs, which can be human-generated or AI-generated (as demonstrated by Zephyr with UltraFeedback).</li>
+      </ul>
+
+      <p>
+        The mathematical insight at the heart of DPO — that the optimal policy under KL-constrained reward maximization can be expressed as a simple loss without an explicit reward model — has influenced subsequent work on alignment. ORPO's odds-ratio formulation ([Paper 12]) is a direct extension of this framework, replacing the probability ratio with an odds ratio for improved training dynamics.
+      </p>
+
+      <div class="swi-tags">
+        <span class="swi-tag">Preference Optimization</span>
+        <span class="swi-tag">RLHF Alternative</span>
+        <span class="swi-tag">Bradley-Terry Model</span>
+        <span class="swi-tag">Reward Reparameterization</span>
+        <span class="swi-tag">Binary Cross-Entropy</span>
+        <span class="swi-tag">Implicit Reward</span>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TinyStories: How Small Can Language Models Be? — Deep Analysis</title>
+  <meta name="description" content="An exhaustive analysis of TinyStories by Eldan & Li, covering synthetic dataset construction, GPT-4 evaluation methodology, capability emergence hierarchy, width vs depth tradeoffs, and scaling laws.">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Noto+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    :root { --swi-ink: #000; --swi-muted: #666; --swi-tldr-bg: #f5f5f5; --swi-link: #000; }
+    body { font-family: 'Noto Sans', sans-serif; color: #000; background: #fff; }
+    .publication-body a { color: #000; border-bottom: 1px solid rgba(0,0,0,.2); }
+    .publication-body a:hover { border-bottom-color: #000; }
+    .publication-body strong { color: #000; }
+    .swi-gradient { background: linear-gradient(90deg,#d4380d,#fa541c,#fa8c16); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 700; }
+    .publication-title { font-family: 'Google Sans', sans-serif; font-size: 2.6rem; line-height: 1.15; letter-spacing: -.01em; font-weight: 700; }
+    .publication-authors { font-family: 'Google Sans', sans-serif; color: #666; font-size: 1.05rem; }
+    .publication-authors a { color: #000 !important; font-weight: 600; }
+    .publication-authors a:hover { text-decoration: underline; }
+    .author-block { display: inline-block; }
+    .publication-venue { color: #666; font-weight: bold; width: fit-content; }
+    .link-block a { margin: 6px 8px; }
+    .swi-tldr { background-color: #f5f5f5; border-radius: 10px; padding: 18px 22px; font-family: 'Google Sans', sans-serif; font-size: 1.02rem; line-height: 1.55; max-width: 112%; margin: 10px auto; }
+    .section h2.title { font-family: 'Google Sans', sans-serif; font-size: 1.85rem; color: #000; font-weight: 700; }
+    .section h3.subtitle, .section h3.title { font-family: 'Noto Sans', sans-serif; font-size: 1.25rem; color: #000; font-weight: 600; margin-top: 1.5rem; }
+    .publication-body { font-family: 'Noto Sans', sans-serif; font-size: 1.08rem; line-height: 1.7; color: #111; }
+    .publication-body p { margin-bottom: 1.1rem; }
+    .publication-body code { font-family: 'Noto Sans', sans-serif; font-size: .92em; background: #f5f5f5; padding: .1em .4em; border-radius: 4px; color: #111; font-weight: 500; }
+    .publication-body pre { background: #111; color: #eee; padding: 16px 20px; border-radius: 8px; font-size: .88rem; line-height: 1.5; overflow-x: auto; margin: 1rem 0; }
+    .publication-body pre code { background: transparent; color: inherit; padding: 0; }
+    .swi-table { width: 100%; border-collapse: collapse; font-family: 'Google Sans', sans-serif; font-size: .95rem; margin: 1.5rem 0; }
+    .swi-table th, .swi-table td { padding: 12px 16px; text-align: left; }
+    .swi-table th { font-weight: 700; color: #000; border-bottom: 2px solid #000; }
+    .swi-table td { border-bottom: 1px solid #eee; }
+    .swi-table tr:last-child td { border-bottom: none; }
+    .swi-table td:first-child { font-weight: 600; }
+    .swi-table-striped tbody tr:nth-child(even) { background: #fafafa; }
+    .swi-win { font-weight: 700; }
+    .swi-callout { display: flex; gap: 14px; background: #f5f5f5; border-radius: 8px; padding: 16px 20px; margin: 1.5rem 0; }
+    .swi-callout-icon { font-size: 1.4rem; flex-shrink: 0; }
+    .swi-callout-body { font-size: .97rem; line-height: 1.6; }
+    .swi-pullquote { margin: 2rem 0; padding: 16px 24px; background: #f5f5f5; border-radius: 8px; font-style: italic; font-size: 1.1rem; line-height: 1.65; color: #333; }
+    .swi-pullquote p { margin: 0; }
+    .swi-steps { display: flex; gap: 20px; margin: 1.5rem 0; }
+    .swi-step { flex: 1; display: flex; gap: 12px; background: #f5f5f5; border-radius: 10px; padding: 16px; }
+    .swi-step-number { width: 32px; height: 32px; border-radius: 50%; background: #000; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: .9rem; flex-shrink: 0; }
+    .swi-step-content h4 { font-size: .95rem; margin-bottom: .3rem; color: #000; }
+    .swi-step-content p { font-size: .88rem; line-height: 1.45; color: #555; margin: 0; }
+    .swi-accordion { border: 1px solid #e5e9ef; border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
+    .swi-accordion summary { padding: 14px 18px; cursor: pointer; font-weight: 600; font-size: .97rem; background: #f5f5f5; list-style: none; display: flex; align-items: center; gap: 8px; color: #000; }
+    .swi-accordion summary::before { content: "▸"; transition: transform .2s; font-size: .8rem; color: #000; }
+    .swi-accordion[open] summary::before { transform: rotate(90deg); }
+    .swi-accordion summary::-webkit-details-marker { display: none; }
+    .swi-accordion-body { padding: 14px 18px; font-size: .93rem; line-height: 1.6; border-top: 1px solid #e5e9ef; }
+    .swi-tags { display: flex; flex-wrap: wrap; gap: 8px; margin: 1rem 0 2rem; }
+    .swi-tag { display: inline-block; padding: 5px 14px; border-radius: 20px; font-size: .82rem; font-weight: 500; background: #f5f5f5; color: #000; border: 1px solid #ddd; transition: background .15s; }
+    .swi-tag:hover { background: #000; color: #fff; border-color: #000; }
+    @media (max-width: 768px) { .publication-title { font-size: 1.9rem; } .publication-body { font-size: 1rem; } .swi-steps { flex-direction: column; } .swi-step { flex-direction: column; text-align: center; } .swi-step-number { margin-bottom: .5rem; } }
+  </style>
+</head>
+<body>
+
+<section class="hero" style="padding-top: 1rem;">
+  <div class="hero-body" style="padding-bottom: 0.5rem;">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+          <h1 class="title is-1 publication-title">
+            <span class="swi-gradient">TinyStories: How Small Can Language Models Be?</span>
+          </h1>
+          <div class="is-size-5 publication-authors" style="margin-top:.6em;">
+            <span class="author-block"><a href="https://arxiv.org/abs/2305.07759">Ronen Eldan &amp; Yuanzhi Li</a></span>
+          </div>
+          <div class="is-size-5 publication-authors" style="margin-top:.4em;">
+            <span class="publication-venue">arXiv:2305.07759</span>
+          </div>
+          <div class="is-size-5 publication-authors" style="margin-top:.4em;">
+            <span class="author-block">May 2023</span>
+          </div>
+          <div class="column has-text-centered" style="margin-top:1.2rem;">
+            <div class="publication-links">
+              <span class="link-block">
+                <a href="https://arxiv.org/abs/2305.07759" class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon"><i class="fas fa-file-pdf"></i></span>
+                  <span>arXiv Paper</span>
+                </a>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" style="padding-bottom:0; padding-top:0;">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <div class="swi-tldr has-text-justified">
+          <p>TinyStories investigates the lower bounds of language model size by constructing a synthetic dataset of children's stories using a controlled 1,500-word vocabulary and training small GPT-like models on it. The paper introduces GPT-4 as an automated evaluator, discovers a hierarchical emergence of capabilities (grammar → consistency → creativity), reveals that width and depth have qualitatively different effects on model behavior, and provides empirical evidence for polynomial scaling laws at small scale. This work fundamentally shifted the field's understanding of what small models can achieve and pioneered the now-standard practice of using large models to evaluate smaller ones.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section publication-body" style="padding-top:1.5rem;">
+  <div class="container is-max-desktop">
+    <div class="content has-text-justified">
+
+      <div class="swi-tags">
+        <span class="swi-tag">Small Models</span>
+        <span class="swi-tag">Synthetic Data</span>
+        <span class="swi-tag">GPT-4 Evaluation</span>
+        <span class="swi-tag">Emergent Capabilities</span>
+        <span class="swi-tag">Scaling Laws</span>
+        <span class="swi-tag">Interpretability</span>
+        <span class="swi-tag">Width vs Depth</span>
+      </div>
+
+      <h2 class="title">1. Motivation and Research Questions</h2>
+
+      <p>
+        Prior to TinyStories, the prevailing wisdom in language modeling was "bigger is better." GPT-3 (175B parameters) had demonstrated that scale alone could produce remarkable capabilities, and the field was racing toward ever-larger models. But this raised a fundamental question: <em>what is the minimum model size at which a language model can produce coherent, grammatical, and logically consistent text?</em>
+      </p>
+
+      <p>
+        Previous attempts to train small language models on standard web data had consistently failed to produce coherent output. Models below 1B parameters trained on standard corpora would generate garbled, repetitive, or nonsensical text. But Eldan and Li hypothesized that this failure was not due to insufficient model capacity — it was due to the <strong>mismatch between model capacity and data complexity</strong>. Standard English uses an enormous vocabulary, complex syntactic structures, and requires world knowledge that demands substantial model capacity. By dramatically simplifying the data, could smaller models achieve coherence?
+      </p>
+
+      <div class="swi-pullquote">
+        <p>"The question is not 'how big must a model be to speak English?' but rather 'how small can a model be if we simplify the task appropriately?' — and the answer turns out to be remarkably small."</p>
+      </div>
+
+      <h2 class="title">2. Dataset Construction: The TinyStories Pipeline</h2>
+
+      <h3 class="title">2.1 Vocabulary Design</h3>
+
+      <p>
+        The TinyStories vocabulary is a carefully curated set of approximately <strong>1,500 words</strong> — chosen to be appropriate for 3-to-4-year-old children. This includes common nouns (cat, dog, house, tree), simple verbs (run, jump, eat, sleep), basic adjectives (big, small, happy, sad), function words (the, a, is, was), and a small set of named entities (Tom, Lucy, Sunny). The vocabulary is deliberately constrained to exclude:
+      </p>
+
+      <ul>
+        <li>Abstract concepts (democracy, philosophy, quantum)</li>
+        <li>Complex syntactic constructions (relative clauses, passive voice with agent)</li>
+        <li>Technical or domain-specific vocabulary</li>
+        <li>Numbers beyond simple counting</li>
+      </ul>
+
+      <h3 class="title">2.2 Story Generation Template</h3>
+
+      <p>
+        Stories are generated using a two-stage pipeline. First, a template system defines the structural skeleton of each story. Each story includes:
+      </p>
+
+      <div class="swi-steps">
+        <div class="swi-step">
+          <div class="swi-step-number">1</div>
+          <div class="swi-step-content">
+            <h4>Characters</h4>
+            <p>1-3 named characters with a simple attribute (e.g., "Tom, who was small" or "Lucy, who loved to dance").</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">2</div>
+          <div class="swi-step-content">
+            <h4>Setting</h4>
+            <p>A simple scene (forest, house, garden, school).</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">3</div>
+          <div class="swi-step-content">
+            <h4>Plot</h4>
+            <p>A narrative arc with 2-3 events, including a problem/conflict and resolution.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="swi-steps">
+        <div class="swi-step">
+          <div class="swi-step-number">4</div>
+          <div class="swi-step-content">
+            <h4>Moral/Ending</h4>
+            <p>A simple lesson or positive conclusion (sharing is good, be kind, try hard).</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">5</div>
+          <div class="swi-step-content">
+            <h4>Optional Features</h4>
+            <p>Stories can include dialogue, emotional states, cause-effect chains, and temporal sequencing to test different capabilities.</p>
+          </div>
+        </div>
+      </div>
+
+      <p>
+        The templates were combined with GPT-3.5-turbo to produce approximately <strong>2 million stories</strong>, each ranging from 50 to 200 words. The GPT-3.5 model was prompted to generate stories following the template structure while staying within the controlled vocabulary. This produced a dataset that is structurally diverse but linguistically constrained.
+      </p>
+
+      <h3 class="title">2.3 Controlled Randomness</h3>
+
+      <p>
+        A key innovation is the systematic injection of randomness. At each story generation step, random choices are made for:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>Component</th><th>Random Choices</th><th>Purpose</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Character names</td><td>Drawn from pool of ~50 names</td><td>Prevents overfitting to specific characters</td></tr>
+          <tr><td>Attributes</td><td>Random adjective + hobby/trait</td><td>Tests attribute tracking</td></tr>
+          <tr><td>Setting</td><td>10 possible locations</td><td>Variety in scene descriptions</td></tr>
+          <tr><td>Plot events</td><td>Randomly sampled from event templates</td><td>Prevents formulaic generation</td></tr>
+          <tr><td>Dialogue presence</td><td>50% chance of including dialogue</td><td>Tests conversational generation</td></tr>
+          <tr><td>Moral complexity</td><td>Simple vs. slightly nuanced morals</td><td>Tests reasoning depth</td></tr>
+        </tbody>
+      </table>
+
+      <h2 class="title">3. Model Architectures Tested</h2>
+
+      <p>
+        The paper systematically tests a range of GPT-like decoder-only transformer models, varying both width and depth:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>Model Name</th><th>Parameters</th><th>Layers</th><th>Hidden Dim</th><th>Heads</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>TinyStories-3M</td><td>~3M</td><td>4</td><td>128</td><td>4</td></tr>
+          <tr><td>TinyStories-8M</td><td>~8M</td><td>6</td><td>192</td><td>6</td></tr>
+          <tr><td>TinyStories-28M</td><td>~28M</td><td>10</td><td>256</td><td>8</td></tr>
+          <tr><td>TinyStories-33M</td><td>~33M</td><td>8</td><td>384</td><td>12</td></tr>
+          <tr><td>TinyStories-60M</td><td>~60M</td><td>12</td><td>512</td><td>16</td></tr>
+          <tr><td>GPT-2 Small (reference)</td><td>117M</td><td>12</td><td>768</td><td>12</td></tr>
+        </tbody>
+      </table>
+
+      <p>
+        All models use the same training setup: Adam optimizer, learning rate warmup, standard transformer decoder architecture with causal masking. The key variable is model size (controlled by width × depth), allowing systematic analysis of how capabilities scale.
+      </p>
+
+      <h2 class="title">4. GPT-4 as Evaluator: The GPT-Eval Framework</h2>
+
+      <h3 class="title">4.1 The Evaluation Problem</h3>
+
+      <p>
+        Traditional NLP metrics (perplexity, BLEU, ROUGE) fail to capture the qualities that matter for story generation. A story can have low perplexity but be incoherent; high BLEU to a reference but lack creativity. TinyStories introduces <strong>GPT-Eval</strong>, using GPT-4 as an automated evaluator to judge story quality along four dimensions:
+      </p>
+
+      <div class="swi-steps">
+        <div class="swi-step">
+          <div class="swi-step-number">1</div>
+          <div class="swi-step-content">
+            <h4>Grammar</h4>
+            <p>Is the text grammatically correct? Are sentences well-formed? Are tenses consistent?</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">2</div>
+          <div class="swi-step-content">
+            <h4>Consistency</h4>
+            <p>Do characters maintain their attributes? Are cause-effect relationships logical? Does the story make sense?</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">3</div>
+          <div class="swi-step-content">
+            <h4>Creativity</h4>
+            <p>Is the story novel and interesting? Does it go beyond simple template-filling?</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">4</div>
+          <div class="swi-step-content">
+            <h4>Overall</h4>
+            <p>A holistic quality score combining all dimensions.</p>
+          </div>
+        </div>
+      </div>
+
+      <h3 class="title">4.2 Evaluation Methodology</h3>
+
+      <p>
+        GPT-4 evaluates each story by receiving the story text and a rubric describing the scoring criteria. Scores are assigned on a scale of 1-5 for each dimension. The evaluation is done independently for 500 sampled stories per model, and the average score across all samples is reported. The paper validates GPT-4's evaluations against human judgments on a subset, finding strong correlation (Spearman ρ > 0.85 across all dimensions).
+      </p>
+
+      <div class="swi-callout">
+        <span class="swi-callout-icon">🔬</span>
+        <div class="swi-callout-body">
+          <strong>Impact on the field:</strong> The GPT-Eval methodology pioneered the now-standard practice of using large models to evaluate smaller ones. This approach has been adopted by countless subsequent papers and benchmarks (AlpacaEval, MT-Bench, Arena-Hard). The key insight: when evaluating subjective qualities like coherence and creativity, a sufficiently capable LLM evaluator is more reliable than traditional metrics.
+        </div>
+      </div>
+
+      <h2 class="title">5. Key Results: The Capability Emergence Hierarchy</h2>
+
+      <h3 class="title">5.1 Results Overview</h3>
+
+      <p>
+        The most striking finding is a clear <strong>hierarchy of capability emergence</strong>: certain abilities appear at much smaller model sizes than others.
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>Capability</th><th>Minimum Model Size</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Grammar</td><td>~3M parameters</td><td>Even the smallest model achieves reasonable grammar</td></tr>
+          <tr><td>Basic coherence</td><td>~8M parameters</td><td>Sentences relate to each other logically</td></tr>
+          <tr><td>Consistency</td><td>~28M parameters</td><td>Characters maintain attributes across the story</td></tr>
+          <tr><td>Dialogue</td><td>~33M parameters</td><td>Character speech is appropriate and in-character</td></tr>
+          <tr><td>Creativity</td><td>~60M parameters</td><td>Novel, non-repetitive stories with interesting plots</td></tr>
+        </tbody>
+      </table>
+
+      <div class="swi-pullquote">
+        <p>"Grammar is essentially 'solved' at small scale. Consistency requires more capacity. Creativity — the ability to generate something genuinely novel — demands the largest models, suggesting it may be an emergent capability that requires a threshold of capacity."</p>
+      </div>
+
+      <h3 class="title">5.2 Detailed Analysis by Capability</h3>
+
+      <h4>Grammar (≥3M parameters)</h4>
+      <p>
+        Even the 3M-parameter model produces grammatically correct text most of the time. This is perhaps unsurprising given the constrained vocabulary — with only 1,500 words and simple sentence structures, the syntactic patterns are limited and repetitive. The model can learn subject-verb agreement, tense consistency, and basic punctuation from relatively few examples. This suggests that <strong>grammar is primarily a surface-level pattern</strong> that requires minimal model capacity to learn.
+      </p>
+
+      <h4>Consistency (≥28M parameters)</h4>
+      <p>
+        Logical consistency — maintaining character attributes, following cause-effect relationships, and producing coherent narratives — requires significantly more capacity. A character named "Tom who was small" must remain small throughout the story; if Tom finds a treasure, the story must logically connect this to earlier events. This requires the model to <strong>track state across positions</strong>, which demands the kind of long-range dependency modeling that Transformers handle through self-attention. The 28M model begins to achieve this, but with frequent failures — characters occasionally "forget" their attributes or events occur without logical connection.
+      </p>
+
+      <h4>Creativity (≥60M parameters)</h4>
+      <p>
+        The most demanding capability is creativity — generating stories that are not merely grammatical and consistent but also novel and interesting. Smaller models tend to produce formulaic, repetitive stories (the same plot structure with different character names). The 60M model begins to show genuine novelty: unexpected plot twists, interesting character interactions, and varied narrative structures. This suggests creativity is an <strong>emergent capability</strong> that requires sufficient capacity to simultaneously track grammar, consistency, AND novelty.
+      </p>
+
+      <h2 class="title">6. Width vs. Depth Experiments</h2>
+
+      <h3 class="title">6.1 Experimental Design</h3>
+
+      <p>
+        The paper conducts careful ablations comparing models with the same parameter count but different width-depth ratios. For example, comparing a model with 8 layers × 256 hidden dim (deeper, narrower) against 4 layers × 384 hidden dim (shallower, wider), both with approximately 28M parameters.
+      </p>
+
+      <h3 class="title">6.2 Findings</h3>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>Aspect</th><th>Deeper Models</th><th>Wider Models</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Consistency</td><td class="swi-win">Significantly better</td><td>Weaker attribute tracking</td></tr>
+          <tr><td>Grammar</td><td>Slightly better</td><td>Comparable</td></tr>
+          <tr><td>Surface patterns</td><td>Comparable</td><td class="swi-win">Slightly better</td></tr>
+          <tr><td>Long-range dependencies</td><td class="swi-win">Better (more processing steps)</td><td>Weaker</td></tr>
+          <tr><td>Vocabulary/richness</td><td>Comparable</td><td class="swi-win">Slightly more diverse</td></tr>
+        </tbody>
+      </table>
+
+      <p>
+        The key insight: <strong>depth matters for consistency</strong>. Deeper models, with more sequential processing steps, are better at maintaining long-range dependencies like character attributes and plot coherence. Each additional layer provides another opportunity for information to propagate across positions via the attention mechanism. Width, on the other hand, provides more representational capacity at each position — useful for capturing local patterns and diverse vocabulary, but less effective for the long-range tracking that consistency requires.
+      </p>
+
+      <div class="swi-callout">
+        <span class="swi-callout-icon">💡</span>
+        <div class="swi-callout-body">
+          <strong>Practical implication:</strong> If your task requires maintaining consistency over long contexts (e.g., long-form generation, multi-turn dialogue), prefer deeper models. If your task is more about local pattern recognition (e.g., classification, short-form generation), wider models may be more efficient. This insight informs architecture decisions for small models like <strong>Paper 04: SmolLM2</strong>, which uses 24 layers for its 1.7B model.
+        </div>
+      </div>
+
+      <h2 class="title">7. Memorization Analysis</h2>
+
+      <h3 class="title">7.1 ROUGE Overlap</h3>
+
+      <p>
+        A critical concern with synthetic datasets is <strong>memorization</strong> — the model might simply be memorizing training stories rather than learning to generate new ones. The paper addresses this by computing ROUGE-L overlap between generated stories and the nearest training examples.
+      </p>
+
+      <p>
+        Results show that smaller models (3M-8M) have higher ROUGE-L scores to training examples, suggesting they rely more on memorization. Larger models (60M) have lower overlap, indicating they are genuinely generating novel stories by combining learned patterns in new ways. This supports the interpretation that <strong>creativity requires sufficient capacity to generalize beyond memorization</strong>.
+      </p>
+
+      <h3 class="title">7.2 Out-of-Distribution Generalization</h3>
+
+      <p>
+        To further test generalization, the paper evaluates models on stories that use vocabulary or structures not seen during training. Larger models generalize better to these out-of-distribution examples, while smaller models degrade significantly. This suggests that smaller models are more dependent on surface-level memorization, while larger models have learned more abstract compositional rules.
+      </p>
+
+      <h2 class="title">8. Scaling Laws at Small Scale</h2>
+
+      <h3 class="title">8.1 Polynomial Scaling</h3>
+
+      <p>
+        The paper provides evidence for a <strong>polynomial relationship</strong> between model size and performance on the GPT-Eval metrics. As model parameters increase from 3M to 60M, performance improves following a power law:
+      </p>
+
+<pre><code>Score ∝ N^α
+
+where:
+  N = number of parameters
+  α ≈ 0.3-0.5 (varies by capability)
+  Grammar: α ≈ 0.3 (diminishing returns, already good at small scale)
+  Consistency: α ≈ 0.4 (steady improvement)
+  Creativity: α ≈ 0.5 (strongest scaling, most room to improve)</code></pre>
+
+      <p>
+        This is significant because it suggests that the scaling laws observed at billion-parameter scales (Kaplan et al., 2020; Hoffmann et al., 2022) also hold at much smaller scales. The different exponents for different capabilities confirm the emergence hierarchy: capabilities with higher exponents require more scaling to improve, consistent with them being more demanding.
+      </p>
+
+      <h3 class="title">8.2 Data Scaling</h3>
+
+      <p>
+        The paper also explores how performance scales with dataset size. Doubling the number of stories from 1M to 2M improves performance, but with diminishing returns. The dataset size appears to interact with model size: smaller models benefit more from additional data (they're underfitting), while larger models benefit less (they're already approaching the capacity limit for the task).
+      </p>
+
+      <h2 class="title">9. Interpretability: Attention and MLP Analysis</h2>
+
+      <h3 class="title">9.1 Attention Head Specialization</h3>
+
+      <p>
+        The paper examines attention patterns in trained models and finds evidence of specialization even at small scale. Some attention heads consistently attend to:
+      </p>
+
+      <ul>
+        <li><strong>Previous token:</strong> A strong diagonal pattern, attending to the immediately preceding token — useful for local syntax</li>
+        <li><strong>Character mentions:</strong> Some heads attend to positions where a character was first introduced, maintaining attribute tracking</li>
+        <li><strong>Sentence boundaries:</strong> Attention to period/full-stop tokens, helping the model segment the text into sentences</li>
+        <li><strong>Dialogue markers:</strong> In stories with dialogue, specific heads attend to quotation marks and speech verbs</li>
+      </ul>
+
+      <h3 class="title">9.2 MLP Neuron Activation</h3>
+
+      <p>
+        Analysis of MLP layers reveals that specific neurons activate for specific semantic concepts. Some neurons fire when a character attribute is mentioned (e.g., "small", "brave"), while others activate for specific plot events (finding something, meeting someone). This suggests that even small models develop <strong>compositional representations</strong> — they don't just memorize sequences but decompose stories into meaningful components.
+      </p>
+
+      <div class="swi-accordion">
+        <summary>Detailed: Attention pattern analysis methodology</summary>
+        <div class="swi-accordion-body">
+          The authors visualize attention patterns by averaging attention weights across many generated stories. For each attention head, they compute the average attention weight matrix and identify consistent patterns. A head that always attends to the previous token will show a strong super-diagonal; a head that attends to character mentions will show off-diagonal patterns at positions where named entities appear. They also compute the attention entropy — low entropy means the head focuses on a small number of positions (specialized), while high entropy means it spreads attention broadly (general). Specialized heads tend to appear in middle layers, while early and late layers have more distributed attention.
+        </div>
+      </div>
+
+      <h2 class="title">10. Comparison with Standard Training</h2>
+
+      <p>
+        A crucial control experiment compares TinyStories-trained models against models of the same size trained on standard web data (C4, OpenWebText). The results are dramatic:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>Metric</th><th>TinyStories (28M)</th><th>Standard Data (28M)</th><th>GPT-2 Small (117M)</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Grammar Score</td><td class="swi-win">4.2 / 5</td><td>1.8 / 5</td><td>3.9 / 5</td></tr>
+          <tr><td>Consistency Score</td><td class="swi-win">3.5 / 5</td><td>1.2 / 5</td><td>3.1 / 5</td></tr>
+          <tr><td>Creativity Score</td><td>2.8 / 5</td><td>1.0 / 5</td><td class="swi-win">3.3 / 5</td></tr>
+          <tr><td>Coherent text %</td><td class="swi-win">85%</td><td>&lt;5%</td><td>72%</td></tr>
+        </tbody>
+      </table>
+
+      <p>
+        The 28M TinyStories model <strong>outperforms the 117M GPT-2 model</strong> (4× larger) on grammar and consistency when evaluated on in-domain stories. This is a powerful demonstration that data quality and task appropriateness matter more than raw model size — a principle that connects directly to <strong>Paper 03: Phi-1</strong>, which proved the same point for code generation.
+      </p>
+
+      <h2 class="title">11. Limitations</h2>
+
+      <ul>
+        <li><strong>Restricted domain:</strong> The results apply only to children's stories with a 1,500-word vocabulary. It's unclear how the findings generalize to more complex language tasks.</li>
+        <li><strong>Template artifacts:</strong> Stories generated from templates may have structural biases that make them easier to learn than natural text.</li>
+        <li><strong>GPT-4 evaluator bias:</strong> GPT-4 may have systematic biases in its evaluations — for example, preferring certain narrative styles or penalizing unusual but creative choices.</li>
+        <li><strong>No real-world deployment:</strong> These models are research tools, not production systems. The constrained vocabulary limits practical utility.</li>
+        <li><strong>Limited architecture exploration:</strong> The paper only tests standard GPT-like architectures. Other architectures (RNNs, state-space models) might show different scaling behavior.</li>
+      </ul>
+
+      <h2 class="title">12. Practical Implications and Legacy</h2>
+
+      <p>
+        TinyStories had an outsized impact on the field despite its narrow scope. Its key contributions:
+      </p>
+
+      <ul>
+        <li><strong>Validated data quality over scale:</strong> This principle, demonstrated most dramatically in <strong>Paper 03: Phi-1</strong>, became a core tenet of modern AI development.</li>
+        <li><strong>Pioneered LLM-as-judge:</strong> The GPT-Eval approach is now the standard for evaluating open-ended generation (AlpacaEval, MT-Bench).</li>
+        <li><strong>Established capability emergence hierarchy:</strong> The grammar → consistency → creativity ordering has been observed in many subsequent studies at larger scales.</li>
+        <li><strong>Informed small-model research:</strong> Directly influenced projects like <strong>Paper 04: SmolLM2</strong>, Phi-2, and other small-model efforts that prioritize data curation.</li>
+        <li><strong>Width vs depth guidance:</strong> The finding that depth aids consistency while width aids surface patterns has practical implications for architecture design.</li>
+      </ul>
+
+      <div class="swi-callout">
+        <span class="swi-callout-icon">🎯</span>
+        <div class="swi-callout-body">
+          <strong>Connection to this collection:</strong> TinyStories is the conceptual ancestor of <strong>Paper 03: Phi-1</strong> (data quality > scale for code) and <strong>Paper 04: SmolLM2</strong> (data curation for small models). The GPT-Eval methodology pioneered here is used across modern LLM evaluation. The capability emergence hierarchy provides a framework for understanding what small models can and cannot do.
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

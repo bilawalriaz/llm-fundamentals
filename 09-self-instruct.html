@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Self-Instruct: Aligning Language Models with Self-Generated Instructions</title>
+  <meta name="description" content="Comprehensive analysis of Self-Instruct (Wang et al., 2022) — bootstrapping instruction-following data from seed tasks using LLMs.">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Noto+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --swi-ink:    #000000;
+      --swi-muted:  #666;
+      --swi-tldr-bg:#f5f5f5;
+      --swi-link:   #000;
+    }
+
+    body {
+      font-family: 'Noto Sans', sans-serif;
+      color: #000;
+      background: #ffffff;
+    }
+
+    .publication-body a {
+      color: #000;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+    }
+    .publication-body a:hover { border-bottom-color: #000; }
+    .publication-body strong { color: #000; }
+
+    .swi-gradient {
+      background: linear-gradient(90deg, #d4380d, #fa541c, #fa8c16);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-weight: bold;
+    }
+
+    .publication-title {
+      font-family: 'Google Sans', sans-serif;
+      font-size: 2.6rem;
+      line-height: 1.15;
+      letter-spacing: -0.01em;
+      font-weight: 700;
+    }
+    .publication-authors {
+      font-family: 'Google Sans', sans-serif;
+      color: #666;
+      font-size: 1.05rem;
+    }
+    .publication-authors a {
+      color: #000 !important;
+      font-weight: 600;
+    }
+    .publication-authors a:hover { text-decoration: underline; }
+    .author-block { display: inline-block; }
+    .publication-venue {
+      color: #666;
+      font-weight: bold;
+      width: fit-content;
+    }
+
+    .link-block a { margin: 6px 8px; }
+
+    .swi-tldr {
+      background-color: #f5f5f5;
+      border-radius: 10px;
+      padding: 18px 22px;
+      font-family: 'Google Sans', sans-serif;
+      font-size: 1.02rem;
+      line-height: 1.55;
+      max-width: 112%;
+      margin: 10px auto;
+    }
+
+    .swi-caption {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      max-width: 97%;
+      margin: 0.4em auto 0 auto;
+      color: #333;
+    }
+
+    .section h2.title {
+      font-family: 'Google Sans', sans-serif;
+      font-size: 1.85rem;
+      color: #000;
+      font-weight: 700;
+    }
+    .section h3.subtitle,
+    .section h3.title {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 1.25rem;
+      color: #000;
+      font-weight: 600;
+      margin-top: 1.5rem;
+    }
+
+    .publication-body {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 1.08rem;
+      line-height: 1.7;
+      color: #111;
+    }
+    .publication-body p { margin-bottom: 1.1rem; }
+    .publication-body code {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 0.92em;
+      background: #f5f5f5;
+      padding: 0.1em 0.4em;
+      border-radius: 4px;
+      color: #111;
+      font-weight: 500;
+    }
+    .publication-body pre {
+      background: #111;
+      color: #eee;
+      padding: 16px 20px;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
+    .publication-body pre code {
+      background: transparent;
+      color: inherit;
+      padding: 0;
+    }
+
+    .swi-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: 'Google Sans', sans-serif;
+      font-size: 0.95rem;
+      margin: 1.5rem 0;
+    }
+    .swi-table th, .swi-table td {
+      padding: 12px 16px;
+      text-align: left;
+    }
+    .swi-table th {
+      font-weight: 700;
+      color: #000;
+      border-bottom: 2px solid #000;
+    }
+    .swi-table td {
+      border-bottom: 1px solid #eee;
+    }
+    .swi-table tr:last-child td { border-bottom: none; }
+    .swi-table td:first-child { font-weight: 600; }
+    .swi-table-striped tbody tr:nth-child(even) { background: #fafafa; }
+
+    .swi-win { font-weight: 700; }
+
+    .swi-paginate {
+      border-top: 1px solid #e5e9ef;
+      margin-top: 3rem;
+      padding-top: 1.5rem;
+      font-family: 'Google Sans', sans-serif;
+      font-size: 0.95rem;
+    }
+    .swi-paginate a { color: #000; }
+
+    .swi-callout {
+      display: flex;
+      gap: 14px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin: 1.5rem 0;
+    }
+    .swi-callout-icon { font-size: 1.4rem; flex-shrink: 0; }
+    .swi-callout-body { font-size: 0.97rem; line-height: 1.6; }
+
+    .swi-pullquote {
+      margin: 2rem 0;
+      padding: 16px 24px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      font-style: italic;
+      font-size: 1.1rem;
+      line-height: 1.65;
+      color: #333;
+    }
+    .swi-pullquote p { margin: 0; }
+
+    .swi-steps {
+      display: flex;
+      gap: 20px;
+      margin: 1.5rem 0;
+    }
+    .swi-step {
+      flex: 1;
+      display: flex;
+      gap: 12px;
+      background: #f5f5f5;
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .swi-step-number {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #000;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+      flex-shrink: 0;
+    }
+    .swi-step-content h4 {
+      font-size: 0.95rem;
+      margin-bottom: 0.3rem;
+      color: #000;
+    }
+    .swi-step-content p {
+      font-size: 0.88rem;
+      line-height: 1.45;
+      color: #555;
+      margin: 0;
+    }
+
+    .swi-image-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 1.5rem 0;
+    }
+    .swi-figure { margin: 0; }
+    .swi-image-placeholder {
+      background: #f0f0f0;
+      border-radius: 10px;
+      aspect-ratio: 4/3;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      color: #999;
+      font-size: 0.85rem;
+      border: 2px dashed #ddd;
+    }
+    .swi-image-icon { font-size: 1.6rem; }
+    .swi-figure figcaption {
+      font-size: 0.82rem;
+      color: #777;
+      margin-top: 6px;
+      text-align: center;
+    }
+
+    .swi-accordion {
+      border: 1px solid #e5e9ef;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      overflow: hidden;
+    }
+    .swi-accordion summary {
+      padding: 14px 18px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.97rem;
+      background: #f5f5f5;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #000;
+    }
+    .swi-accordion summary::before {
+      content: "▸";
+      transition: transform 0.2s;
+      font-size: 0.8rem;
+      color: #000;
+    }
+    .swi-accordion[open] summary::before { transform: rotate(90deg); }
+    .swi-accordion summary::-webkit-details-marker { display: none; }
+    .swi-accordion-body {
+      padding: 14px 18px;
+      font-size: 0.93rem;
+      line-height: 1.6;
+      border-top: 1px solid #e5e9ef;
+    }
+
+    .swi-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 1rem 0 2rem;
+    }
+    .swi-tag {
+      display: inline-block;
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      background: #f5f5f5;
+      color: #000;
+      border: 1px solid #ddd;
+      transition: background 0.15s;
+    }
+    .swi-tag:hover { background: #000; color: #fff; border-color: #000; }
+
+    .swi-author-card {
+      display: flex;
+      gap: 18px;
+      align-items: center;
+      background: #f5f5f5;
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin: 2rem 0;
+    }
+    .swi-author-avatar {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: #000;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 1.1rem;
+      flex-shrink: 0;
+    }
+    .swi-author-info h4 { margin: 0 0 0.3rem; font-size: 1rem; }
+    .swi-author-info h4 a { color: #000; text-decoration: none; font-weight: 600; }
+    .swi-author-info h4 a:hover { text-decoration: underline; }
+    .swi-author-info p { margin: 0; font-size: 0.9rem; color: #666; }
+
+    .swi-related-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 1rem 0 2rem;
+    }
+    .swi-related-card {
+      display: block;
+      padding: 18px 20px;
+      background: #f5f5f5;
+      border-radius: 10px;
+      text-decoration: none;
+      border: 1px solid transparent;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .swi-related-card:hover {
+      border-color: #000;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    }
+    .swi-related-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #888;
+      font-weight: 600;
+    }
+    .swi-related-card h3 {
+      margin: 6px 0 0;
+      font-size: 0.95rem;
+      color: #000;
+      line-height: 1.4;
+      font-weight: 600;
+    }
+
+    @media (max-width: 768px) {
+      .publication-title { font-size: 1.9rem; }
+      .publication-body { font-size: 1rem; }
+      .swi-steps { flex-direction: column; }
+      .swi-step { flex-direction: column; text-align: center; }
+      .swi-step-number { margin-bottom: 0.5rem; }
+      .swi-image-grid { grid-template-columns: 1fr; }
+      .swi-related-grid { grid-template-columns: 1fr; }
+      .swi-author-card { flex-direction: column; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- HERO -->
+<section class="hero" style="padding-top: 1rem;">
+  <div class="hero-body" style="padding-bottom: 0.5rem;">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+          <h1 class="title is-1 publication-title">
+            <span class="swi-gradient">Self-Instruct: Aligning Language Models with Self-Generated Instructions</span>
+          </h1>
+
+          <div class="is-size-5 publication-authors" style="margin-top: 0.6em;">
+            <span class="author-block"><a href="https://arxiv.org/abs/2212.10560">Yizhong Wang, Yeganeh Kordi, Swaroop Mishra, Alisa Liu, Noah A. Smith, Daniel Khashabi, Hannaneh Hajishirzi</a></span>
+          </div>
+
+          <div class="is-size-5 publication-authors" style="margin-top: 0.4em;">
+            <span class="publication-venue">arXiv 2212.10560</span>
+          </div>
+
+          <div class="is-size-5 publication-authors" style="margin-top: 0.4em;">
+            <span class="author-block">December 2022</span>
+          </div>
+
+          <div class="column has-text-centered" style="margin-top: 1.2rem;">
+            <div class="publication-links">
+              <span class="link-block">
+                <a href="https://arxiv.org/abs/2212.10560"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon"><i class="fas fa-file-pdf"></i></span>
+                  <span>Paper</span>
+                </a>
+              </span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ABSTRACT (TL;DR) -->
+<section class="section" style="padding-bottom: 0; padding-top: 0;">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <div class="swi-tldr has-text-justified">
+          <p>
+            Self-Instruct demonstrates that a language model can bootstrap a large corpus of instruction-following training data starting from just <strong>175 human-written seed tasks</strong>. By iteratively generating new instructions, classifying them, producing input-output instances, and filtering out low-quality samples, the method produces <strong>52,445 instructions and 82,439 instances</strong> — enough to fine-tune a vanilla GPT-3 model (DaVinci) to nearly match the performance of InstructGPT-001 on the SUPER-NATURAL INSTRUCTIONS benchmark. The core pipeline — seed → generate → filter → augment — became the foundational template for virtually all subsequent open-source instruction-tuning datasets, including Alpaca, WizardLM, and Vicuna.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- BODY -->
+<section class="section publication-body" style="padding-top: 1.5rem;">
+  <div class="container is-max-desktop">
+    <div class="content has-text-justified">
+
+      <h2 class="title">1. The Problem: Instruction Data Is Expensive</h2>
+
+      <p>
+        Large language models like GPT-3 are powerful but largely unaligned to follow natural-language instructions. The dominant approach to alignment — reinforcement learning from human feedback (RLHF), as used in InstructGPT and ChatGPT — requires collecting large volumes of human-written instruction-input-output triples, which is slow, expensive, and hard to scale. Self-Instruct asks a deceptively simple question: <strong>can a language model generate its own instruction-tuning data?</strong>
+      </p>
+
+      <p>
+        The answer, demonstrated empirically, is yes — with careful engineering of a bootstrapping pipeline. The key insight is that while a model may not be perfectly instruction-aligned out of the box, it is already good enough to generate plausible instructions, and filtering heuristics can remove the garbage. This creates a flywheel: more generated data leads to better fine-tuned models, which in turn generate better data.
+      </p>
+
+      <div class="swi-callout">
+        <span class="swi-callout-icon"><i class="fas fa-lightbulb"></i></span>
+        <div class="swi-callout-body">
+          <strong>Key Insight:</strong> You don't need human-curated datasets at scale. A small set of seed tasks (175 examples) combined with a capable base model and smart filtering can bootstrap an entire instruction-tuning pipeline. This insight launched the synthetic instruction data paradigm.
+        </div>
+      </div>
+
+      <h2 class="title">2. Seed Task Design: The Foundation</h2>
+
+      <p>
+        The entire pipeline begins with a curated set of <strong>175 seed tasks</strong>, each consisting of an instruction, an optional input, and an output. The authors carefully designed this pool to ensure diversity along two axes:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th>Count</th>
+            <th>Description</th>
+            <th>Examples</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Classification tasks</td>
+            <td>25</td>
+            <td>Tasks with a fixed, closed set of labels</td>
+            <td>Sentiment analysis, topic classification, language identification, hate speech detection, toxicity classification</td>
+          </tr>
+          <tr>
+            <td>Non-classification tasks</td>
+            <td>150</td>
+            <td>Open-ended generation, extraction, rewriting, summarization, and other generative tasks</td>
+            <td>Writing a song, explaining a concept, translating text, generating code, answering questions, creating lists</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        The 15:1 ratio of non-classification to classification tasks reflects the real-world distribution of instruction-following needs — most user queries are open-ended, but classification tasks are important to include because they require structured outputs with fixed label spaces. Including classification tasks from the start prevents the model from generating only free-form text, which is a common failure mode.
+      </p>
+
+      <div class="swi-pullquote">
+        <p>"The 175 seed tasks are drawn from 18 different NLP datasets, ensuring broad coverage of task types while remaining small enough to be manually curated in a few hours."</p>
+      </div>
+
+      <h2 class="title">3. The Full Generation Pipeline</h2>
+
+      <p>
+        The Self-Instruct pipeline is an iterative loop that expands the seed set into a massive corpus. Each iteration involves four distinct stages: instruction generation, classification branching, instance generation, and quality filtering.
+      </p>
+
+      <h3 class="subtitle">3.1 Instruction Generation (Few-Shot Prompting)</h3>
+
+      <p>
+        To generate new instructions, the system samples a batch of existing tasks (typically 8–16) from the seed pool and presents them as few-shot examples to the base language model (GPT-3 DaVinci). Crucially, the sampled examples include a <strong>mix of human-written and model-generated instructions</strong> — this hybrid approach prevents the model from converging too quickly on a narrow style.
+      </p>
+
+      <p>
+        The prompt structure follows a straightforward pattern: a task description header, followed by several input-output examples, then a "New task:" prompt where the model generates the instruction. The model is instructed to produce a novel, diverse instruction that is distinct from the provided examples.
+      </p>
+
+      <h3 class="subtitle">3.2 Classification Branching</h3>
+
+      <p>
+        After generating a new instruction, the system must decide whether it is a <strong>classification task</strong> (closed-label) or a <strong>non-classification task</strong> (open-ended). This branching is critical because the instance generation process differs significantly between the two:
+      </p>
+
+      <ul style="margin-bottom: 1.1rem;">
+        <li><strong>Classification path:</strong> The model first generates a set of candidate labels (e.g., "positive," "negative," "neutral"), then generates inputs that correspond to each label. This ensures balanced coverage of the label space.</li>
+        <li><strong>Non-classification path:</strong> The model generates input-output pairs directly, with the input preceding the output.</li>
+      </ul>
+
+      <h3 class="subtitle">3.3 Input-First vs. Output-First Generation</h3>
+
+      <p>
+        The two generation strategies are designed to handle different instruction types optimally:
+      </p>
+
+      <div class="swi-steps">
+        <div class="swi-step">
+          <div class="swi-step-number">1</div>
+          <div class="swi-step-content">
+            <h4>Input-First</h4>
+            <p>The model generates an input first, then produces the corresponding output. Used for most non-classification tasks where the input defines the task scope (e.g., "Write a poem about spring" → input: "a poem about renewal and hope").</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">2</div>
+          <div class="swi-step-content">
+            <h4>Output-First</h4>
+            <p>The model generates the output first, then creates a plausible input that would produce it. Used when the output is the defining feature (e.g., classification labels, or tasks where the desired format is paramount).</p>
+          </div>
+        </div>
+      </div>
+
+      <h3 class="subtitle">3.4 ROUGE-L Filtering</h3>
+
+      <p>
+        Not all generated instructions are useful. The filtering stage applies two key heuristics:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr>
+            <th>Filter</th>
+            <th>Threshold</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ROUGE-L with seed tasks (upper)</td>
+            <td>&gt; 0.7</td>
+            <td>Remove instructions too similar to existing seeds (duplicates/near-duplicates)</td>
+          </tr>
+          <tr>
+            <td>ROUGE-L with seed tasks (lower)</td>
+            <td>&lt; 0.7</td>
+            <td>Retain instructions that are sufficiently novel</td>
+          </tr>
+          <tr>
+            <td>Length filter</td>
+            <td>Input + output ≥ 3 tokens</td>
+            <td>Remove degenerate empty or trivial instances</td>
+          </tr>
+          <tr>
+            <td>Repetition filter</td>
+            <td>—</td>
+            <td>Remove instructions with excessive word repetition</td>
+          </tr>
+          <tr>
+            <td>Keyword filter</td>
+            <td>—</td>
+            <td>Remove instructions referencing non-textual modalities (e.g., "image," "photo," "video")</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        The ROUGE-L threshold of 0.7 is a deliberate design choice. Instructions that are too similar to existing seeds (ROUGE-L > 0.7) are likely duplicates and add no diversity. Instructions that are too dissimilar (ROUGE-L < 0.7 from all existing instructions) might be malformed or incoherent. The sweet spot ensures genuine novelty while maintaining quality.
+      </p>
+
+      <div class="swi-callout">
+        <span class="swi-callout-icon"><i class="fas fa-filter"></i></span>
+        <div class="swi-callout-body">
+          <strong>Why the "image" keyword filter matters:</strong> LLMs frequently generate instructions that reference images, photographs, or visual content — modalities they cannot process. Filtering these keywords prevents the dataset from containing unsolvable tasks.
+        </div>
+      </div>
+
+      <h3 class="subtitle">3.5 The Round-Robin Loop</h3>
+
+      <p>
+        After filtering, the surviving instructions and their instances are added back into the seed pool. The next iteration samples from this expanded pool, including both original human-written seeds and model-generated tasks. This iterative process repeats for multiple rounds, with the quality and diversity of generated tasks improving as the seed pool grows. The round-robin approach ensures that no single generation dominates and that the model is continually exposed to a mix of human and synthetic instructions.
+      </p>
+
+      <h2 class="title">4. Dataset Statistics</h2>
+
+      <p>
+        The final Self-Instruct dataset is substantially larger than the seed set, demonstrating the power of the bootstrapping approach. The key statistics are summarized below:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th>Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Total instructions generated</td>
+            <td>52,445</td>
+          </tr>
+          <tr>
+            <td>Classification instructions</td>
+            <td>11,584 (22.1%)</td>
+          </tr>
+          <tr>
+            <td>Non-classification instructions</td>
+            <td>40,861 (77.9%)</td>
+          </tr>
+          <tr>
+            <td>Total instances (input-output pairs)</td>
+            <td>82,439</td>
+          </tr>
+          <tr>
+            <td>Average instruction length</td>
+            <td>~27 tokens</td>
+          </tr>
+          <tr>
+            <td>Average input length</td>
+            <td>~30 tokens</td>
+          </tr>
+          <tr>
+            <td>Average output length</td>
+            <td>~28 tokens</td>
+          </tr>
+          <tr>
+            <td>Seed tasks used</td>
+            <td>175</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        The 22.1% classification share is notable — it closely mirrors the authors' intentional effort to prevent mode collapse toward only open-ended tasks. Without the classification branching mechanism, the model would generate almost exclusively free-form text tasks.
+      </p>
+
+      <h2 class="title">5. Quality Analysis: How Good Is Synthetic Data?</h2>
+
+      <p>
+        To assess the quality of the generated dataset, the authors conducted a manual review of 200 randomly sampled instructions with their associated instances. The results paint a nuanced picture:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr>
+            <th>Quality Criterion</th>
+            <th>Pass Rate</th>
+            <th>Interpretation</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Valid instruction</td>
+            <td><strong>92%</strong></td>
+            <td>Nearly all generated instructions are coherent, well-formed natural language commands</td>
+          </tr>
+          <tr>
+            <td>Appropriate input</td>
+            <td><strong>79%</strong></td>
+            <td>Most inputs match the instruction's intent and are plausible</td>
+          </tr>
+          <tr>
+            <td>Correct output</td>
+            <td><strong>58%</strong></td>
+            <td>A little over half of the outputs correctly fulfill the instruction</td>
+          </tr>
+          <tr>
+            <td>All fields valid (instruction + input + output)</td>
+            <td><strong>54%</strong></td>
+            <td>Only about half of all instances are fully correct end-to-end</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="swi-callout">
+        <span class="swi-callout-icon"><i class="fas fa-chart-bar"></i></span>
+        <div class="swi-callout-body">
+          <strong>The 54% figure is misleading in isolation.</strong> Even imperfect instances provide signal during fine-tuning — a model trained on 82K partially-correct examples still learns the format, style, and general capabilities of instruction following. The sheer volume compensates for individual instance noise. This is analogous to how noisy web-crawled data works for pre-training.
+        </div>
+      </div>
+
+      <p>
+        The gap between "valid instruction" (92%) and "correct output" (58%) reveals that the generation pipeline is much better at producing plausible prompts than at solving them. This makes sense: the model's instruction-following ability is the bottleneck, not its ability to generate task descriptions.
+      </p>
+
+      <h2 class="title">6. Diversity Analysis</h2>
+
+      <p>
+        A key concern with synthetic data generation is <strong>mode collapse</strong> — the model repeatedly generating the same types of tasks. The authors analyzed diversity along two axes:
+      </p>
+
+      <h3 class="subtitle">Root Verb Distribution</h3>
+      <p>
+        The most common root verbs in generated instructions include: <code>write</code>, <code>give</code>, <code>find</code>, <code>create</code>, <code>generate</code>, <code>explain</code>, <code>list</code>, <code>describe</code>, <code>identify</code>, <code>classify</code>, and <code>convert</code>. The distribution is broad and relatively flat, indicating that the model generates a wide range of task types rather than converging on a few popular verbs.
+      </p>
+
+      <h3 class="subtitle">ROUGE-L Overlap with Seeds</h3>
+      <p>
+        The generated instructions have <strong>low ROUGE-L overlap</strong> with the original seed tasks, confirming genuine novelty. The ROUGE-L filtering step is critical here — without it, the overlap would be significantly higher, as the model tends to reproduce patterns from the few-shot examples. By filtering at the 0.7 threshold, the pipeline ensures that the expanded dataset is genuinely diverse.
+      </p>
+
+      <div class="swi-pullquote">
+        <p>"The diversity of generated instructions is essential — a dataset of 50,000 near-duplicate instructions would be far less useful than 50,000 genuinely distinct tasks, even if the latter have lower per-instance quality."</p>
+      </div>
+
+      <h2 class="title">7. Scaling Properties</h2>
+
+      <p>
+        One of the most practically important findings is how performance scales with dataset size. The authors evaluated models fine-tuned on increasing amounts of Self-Instruct data and found:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr>
+            <th>Dataset Size (instructions)</th>
+            <th>SUPER-NI Score</th>
+            <th>Trend</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>0 (vanilla GPT-3)</td>
+            <td>Baseline</td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <td>~1,000</td>
+            <td>Significant improvement</td>
+            <td>Steep initial gain</td>
+          </tr>
+          <tr>
+            <td>~8,000</td>
+            <td>Strong improvement</td>
+            <td>Continued scaling</td>
+          </tr>
+          <tr>
+            <td>~16,000</td>
+            <td>Near-peak performance</td>
+            <td>Diminishing returns begin</td>
+          </tr>
+          <tr>
+            <td>~52,000</td>
+            <td>Peak performance</td>
+            <td>Plateau — additional data yields marginal gains</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        Performance <strong>plateaus at approximately 16,000 instructions</strong>, after which additional data provides only marginal improvements. This has significant practical implications: researchers can achieve near-optimal results with a fraction of the full dataset, reducing fine-tuning costs. The plateau likely reflects the model's capacity to learn instruction-following from a representative sample — beyond a point, more data merely replicates the same task types.
+      </p>
+
+      <h2 class="title">8. Distillation: Borrowing From Stronger Models</h2>
+
+      <p>
+        Self-Instruct also explores the effect of using a stronger model to generate the output instances. Instead of having GPT-3 DaVinci generate both instructions and their corresponding outputs, the pipeline can use <strong>InstructGPT-003</strong> (the model behind early ChatGPT) to regenerate the outputs while keeping the self-generated instructions.
+      </p>
+
+      <p>
+        This "distillation" approach yields a <strong>+10% improvement</strong> in SUPER-NI performance. The gains come from higher-quality outputs — InstructGPT-003 produces more accurate, well-formatted responses than the base DaVinci model, while the self-generated instructions retain their diversity and novelty.
+      </p>
+
+      <div class="swi-callout">
+        <span class="swi-callout-icon"><i class="fas fa-graduation-cap"></i></span>
+        <div class="swi-callout-body">
+          <strong>The distillation result is a key nuance:</strong> The quality of instructions matters less than the quality of the input-output pairs they produce. Self-generated instructions can be noisy, but if the outputs are generated by a strong model, the resulting dataset is highly effective. This suggests the instruction diversity is more important than instruction perfection.
+        </div>
+      </div>
+
+      <h2 class="title">9. Benchmark Results: Nearly Matching InstructGPT</h2>
+
+      <p>
+        The headline result of Self-Instruct is that a fine-tuned DaVinci model, trained exclusively on self-generated data, <strong>nearly matches the performance of InstructGPT-001</strong> on the SUPER-NATURAL INSTRUCTIONS benchmark — achieving 39.9 versus InstructGPT-001's 40.8.
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th>SUPER-NI Score</th>
+            <th>Training Data</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Vanilla GPT-3 (DaVinci)</td>
+            <td>Baseline (no fine-tuning)</td>
+            <td>None (zero-shot/few-shot)</td>
+          </tr>
+          <tr>
+            <td>Self-Instruct (DaVinci, fine-tuned)</td>
+            <td>~33% improvement over baseline</td>
+            <td>52K self-generated instructions</td>
+          </tr>
+          <tr>
+            <td>InstructGPT-001</td>
+            <td class="swi-win">40.8</td>
+            <td>Human-curated instruction data + RLHF</td>
+          </tr>
+          <tr>
+            <td>Self-Instruct (DaVinci, distilled)</td>
+            <td>~39.9</td>
+            <td>Self-generated instructions + InstructGPT-003 outputs</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        The <strong>+33% improvement</strong> over the vanilla baseline demonstrates that even without human feedback, instruction tuning with synthetic data provides substantial alignment gains. The near-parity with InstructGPT-001 is remarkable given that InstructGPT-001 was trained on carefully curated human data with reinforcement learning.
+      </p>
+
+      <h2 class="title">10. Human Evaluation: 252 Novel Tasks</h2>
+
+      <p>
+        Beyond automated benchmarks, the authors conducted a thorough human evaluation on <strong>252 novel tasks</strong> — tasks not present in the training data or seed set. Human evaluators compared outputs from the Self-Instruct model against InstructGPT-001 across multiple criteria:
+      </p>
+
+      <ul style="margin-bottom: 1.1rem;">
+        <li><strong>Instruction understanding:</strong> Did the model correctly interpret the task?</li>
+        <li><strong>Output quality:</strong> Was the response helpful, accurate, and well-formatted?</li>
+        <li><strong>Factual correctness:</strong> Were the claims in the output accurate?</li>
+      </ul>
+
+      <p>
+        The Self-Instruct model achieved <strong>only a 5% performance gap</strong> relative to InstructGPT-001 on human evaluation. This is a striking result: it means that a model trained purely on self-generated data — no human annotations, no reinforcement learning — performs nearly as well as a model trained with expensive human feedback pipelines.
+      </p>
+
+      <div class="swi-pullquote">
+        <p>"A 5% gap to InstructGPT-001 on human evaluation — using only self-generated data — demonstrates that the quality ceiling of synthetic instruction data is remarkably high."</p>
+      </div>
+
+      <h2 class="title">11. Limitations and Open Challenges</h2>
+
+      <p>
+        Despite its impressive results, Self-Instruct has several acknowledged limitations:
+      </p>
+
+      <h3 class="subtitle">Tail Phenomena</h3>
+      <p>
+        The model struggles with rare, specialized, or "long-tail" tasks that are underrepresented in the training data. The bootstrapping process naturally favors common task types — instructions that are easy to generate and validate. Tasks requiring deep domain expertise, multi-step reasoning, or niche knowledge are poorly served.
+      </p>
+
+      <h3 class="subtitle">Large Model Dependence</h3>
+      <p>
+        The entire pipeline depends on having a sufficiently capable base model. GPT-3 DaVinci (175B parameters) was used as both the generator and the fine-tuning target. Smaller models may not generate high-quality instructions, creating a chicken-and-egg problem: you need a large model to generate the data to train a smaller model, but the smaller model's generation quality may be too poor to bootstrap.
+      </p>
+
+      <h3 class="subtitle">Bias Amplification</h3>
+      <p>
+        Since the base model's biases are baked into the generated data, Self-Instruct can amplify existing biases in the training corpus. The model may generate instructions and outputs that reflect stereotypes, cultural biases, or factual errors present in its pre-training data. Without human review, these biases propagate unchecked through the pipeline.
+      </p>
+
+      <h3 class="subtitle">Output Quality Ceiling</h3>
+      <p>
+        As noted in the quality analysis, only 58% of generated outputs are correct. This means nearly half the training data contains errors. While volume compensates to some extent, the quality ceiling limits the maximum performance achievable through self-instruction alone.
+      </p>
+
+      <h2 class="title">12. The Superficial Alignment Hypothesis</h2>
+
+      <p>
+        Self-Instruct's results are deeply connected to the <strong>superficial alignment hypothesis</strong>, which argues that alignment fine-tuning primarily teaches a model the <em>format</em> and <em>style</em> of helpful responses rather than fundamentally changing its knowledge or reasoning capabilities. The fact that self-generated data works so well supports this view: the model already "knows" how to perform many tasks — it just needs to learn the conversational format of responding to instructions.
+      </p>
+
+      <p>
+        See <strong>Paper 08 (LIMA)</strong> for the superficial alignment hypothesis, which formalizes this observation: with the right fine-tuning data, even a small number of carefully curated examples (as few as 1,000 in LIMA's case) can achieve remarkable alignment. Self-Instruct demonstrates the complementary result: <em>quantity</em> of synthetic data can achieve similar alignment effects through a different route.
+      </p>
+
+      <div class="swi-callout">
+        <span class="swi-callout-icon"><i class="fas fa-link"></i></span>
+        <div class="swi-callout-body">
+          <strong>Cross-reference:</strong> See Paper 08 (LIMA) for the superficial alignment hypothesis. LIMA argues that alignment is "superficial" — models already possess the knowledge; fine-tuning merely teaches the format. Self-Instruct provides strong empirical support: self-generated data, which is noisy and imperfect, still achieves near-InstructGPT performance because the base model already has the underlying capabilities.
+        </div>
+      </div>
+
+      <h2 class="title">13. Impact and Legacy</h2>
+
+      <p>
+        Self-Instruct's impact on the field cannot be overstated. The paper introduced the <strong>synthetic instruction data paradigm</strong> that became the foundation for virtually every open-source instruction-tuned model:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr>
+            <th>Downstream System</th>
+            <th>Relationship to Self-Instruct</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Stanford Alpaca</td>
+            <td>Directly adapted the Self-Instruct pipeline with text-davinci-003 as the generator</td>
+          </tr>
+          <tr>
+            <td>WizardLM</td>
+            <td>Extended the pipeline with evolutionary instruction prompting for more complex tasks</td>
+          </tr>
+          <tr>
+            <td>Vicuna</td>
+            <td>Used self-instruct-style data alongside conversation data from ShareGPT</td>
+          </tr>
+          <tr>
+            <td>Orca / Orca 2</td>
+            <td>Adapted the pipeline with "explanation tuning" — adding reasoning traces to outputs</td>
+          </tr>
+          <tr>
+            <td>Koala, Pythia, and others</td>
+            <td>Various adaptations of the seed → generate → filter → train loop</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        The core loop — <strong>seed → generate → filter → augment → retrain</strong> — is now standard practice for anyone creating custom SFT (supervised fine-tuning) datasets. Self-Instruct proved that you don't need expensive human annotation to align a model; you just need a good base model and a well-designed pipeline.
+      </p>
+
+      <h2 class="title">14. Summary of Contributions</h2>
+
+      <div class="swi-tags">
+        <span class="swi-tag">Seed Task Bootstrapping</span>
+        <span class="swi-tag">52K Instructions</span>
+        <span class="swi-tag">82K Instances</span>
+        <span class="swi-tag">ROUGE-L Filtering</span>
+        <span class="swi-tag">Classification Branching</span>
+        <span class="swi-tag">+33% SUPER-NI</span>
+        <span class="swi-tag">Near InstructGPT-001</span>
+        <span class="swi-tag">+10% Distillation Gain</span>
+        <span class="swi-tag">5% Human Eval Gap</span>
+        <span class="swi-tag">Synthetic Data Paradigm</span>
+      </div>
+
+      <p>
+        Self-Instruct is a landmark paper that demonstrated the viability of self-generated instruction data for alignment. Its contributions are threefold: (1) a practical, reproducible pipeline for generating instruction-tuning data from minimal human effort; (2) rigorous empirical analysis of data quality, diversity, and scaling properties; and (3) benchmark results showing near-parity with human-curated approaches. The paper's legacy is visible in every open-source instruction-tuned model released since its publication.
+      </p>
+
+      <div class="swi-pullquote">
+        <p>"Self-Instruct showed that the gap between proprietary and open-source alignment could be closed — not by better RLHF, but by cleverer data generation."</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

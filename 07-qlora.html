@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QLoRA: Efficient Finetuning of Quantized LLMs</title>
+  <meta name="description" content="Combine 4-bit quantization with LoRA to fine-tune 65B models on a single GPU — NF4, double quantization, paged optimizers, and all-layer adapter placement.">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Noto+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --swi-ink:    #000000;
+      --swi-muted:  #666;
+      --swi-tldr-bg:#f5f5f5;
+      --swi-link:   #000;
+    }
+
+    body {
+      font-family: 'Noto Sans', sans-serif;
+      color: #000;
+      background: #ffffff;
+    }
+
+    .publication-body a {
+      color: #000;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+    }
+    .publication-body a:hover { border-bottom-color: #000; }
+    .publication-body strong { color: #000; }
+
+    .swi-gradient {
+      background: linear-gradient(90deg, #d4380d, #fa541c, #fa8c16);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-weight: bold;
+    }
+
+    .publication-title {
+      font-family: 'Google Sans', sans-serif;
+      font-size: 2.6rem;
+      line-height: 1.15;
+      letter-spacing: -0.01em;
+      font-weight: 700;
+    }
+    .publication-authors {
+      font-family: 'Google Sans', sans-serif;
+      color: #666;
+      font-size: 1.05rem;
+    }
+    .publication-authors a {
+      color: #000 !important;
+      font-weight: 600;
+    }
+    .publication-authors a:hover { text-decoration: underline; }
+    .author-block { display: inline-block; }
+    .publication-venue {
+      color: #666;
+      font-weight: bold;
+      width: fit-content;
+    }
+
+    .link-block a { margin: 6px 8px; }
+
+    .swi-tldr {
+      background-color: #f5f5f5;
+      border-radius: 10px;
+      padding: 18px 22px;
+      font-family: 'Google Sans', sans-serif;
+      font-size: 1.02rem;
+      line-height: 1.55;
+      max-width: 112%;
+      margin: 10px auto;
+    }
+
+    .swi-caption {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      max-width: 97%;
+      margin: 0.4em auto 0 auto;
+      color: #333;
+    }
+
+    .section h2.title {
+      font-family: 'Google Sans', sans-serif;
+      font-size: 1.85rem;
+      color: #000;
+      font-weight: 700;
+    }
+    .section h3.subtitle,
+    .section h3.title {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 1.25rem;
+      color: #000;
+      font-weight: 600;
+      margin-top: 1.5rem;
+    }
+
+    .publication-body {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 1.08rem;
+      line-height: 1.7;
+      color: #111;
+    }
+    .publication-body p { margin-bottom: 1.1rem; }
+    .publication-body code {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 0.92em;
+      background: #f5f5f5;
+      padding: 0.1em 0.4em;
+      border-radius: 4px;
+      color: #111;
+      font-weight: 500;
+    }
+    .publication-body pre {
+      background: #111;
+      color: #eee;
+      padding: 16px 20px;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
+    .publication-body pre code {
+      background: transparent;
+      color: inherit;
+      padding: 0;
+    }
+
+    .swi-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: 'Google Sans', sans-serif;
+      font-size: 0.95rem;
+      margin: 1.5rem 0;
+    }
+    .swi-table th, .swi-table td {
+      padding: 12px 16px;
+      text-align: left;
+    }
+    .swi-table th {
+      font-weight: 700;
+      color: #000;
+      border-bottom: 2px solid #000;
+    }
+    .swi-table td {
+      border-bottom: 1px solid #eee;
+    }
+    .swi-table tr:last-child td { border-bottom: none; }
+    .swi-table td:first-child { font-weight: 600; }
+    .swi-table-striped tbody tr:nth-child(even) { background: #fafafa; }
+
+    .swi-win { font-weight: 700; }
+
+    .swi-paginate {
+      border-top: 1px solid #e5e9ef;
+      margin-top: 3rem;
+      padding-top: 1.5rem;
+      font-family: 'Google Sans', sans-serif;
+      font-size: 0.95rem;
+    }
+    .swi-paginate a { color: #000; }
+
+    .swi-callout {
+      display: flex;
+      gap: 14px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin: 1.5rem 0;
+    }
+    .swi-callout-icon { font-size: 1.4rem; flex-shrink: 0; }
+    .swi-callout-body { font-size: 0.97rem; line-height: 1.6; }
+
+    .swi-pullquote {
+      margin: 2rem 0;
+      padding: 16px 24px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      font-style: italic;
+      font-size: 1.1rem;
+      line-height: 1.65;
+      color: #333;
+    }
+    .swi-pullquote p { margin: 0; }
+
+    .swi-steps {
+      display: flex;
+      gap: 20px;
+      margin: 1.5rem 0;
+    }
+    .swi-step {
+      flex: 1;
+      display: flex;
+      gap: 12px;
+      background: #f5f5f5;
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .swi-step-number {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #000;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+      flex-shrink: 0;
+    }
+    .swi-step-content h4 {
+      font-size: 0.95rem;
+      margin-bottom: 0.3rem;
+      color: #000;
+    }
+    .swi-step-content p {
+      font-size: 0.88rem;
+      line-height: 1.45;
+      color: #555;
+      margin: 0;
+    }
+
+    .swi-image-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 1.5rem 0;
+    }
+    .swi-figure { margin: 0; }
+    .swi-image-placeholder {
+      background: #f0f0f0;
+      border-radius: 10px;
+      aspect-ratio: 4/3;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      color: #999;
+      font-size: 0.85rem;
+      border: 2px dashed #ddd;
+    }
+    .swi-image-icon { font-size: 1.6rem; }
+    .swi-figure figcaption {
+      font-size: 0.82rem;
+      color: #777;
+      margin-top: 6px;
+      text-align: center;
+    }
+
+    .swi-accordion {
+      border: 1px solid #e5e9ef;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      overflow: hidden;
+    }
+    .swi-accordion summary {
+      padding: 14px 18px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.97rem;
+      background: #f5f5f5;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #000;
+    }
+    .swi-accordion summary::before {
+      content: "▸";
+      transition: transform 0.2s;
+      font-size: 0.8rem;
+      color: #000;
+    }
+    .swi-accordion[open] summary::before { transform: rotate(90deg); }
+    .swi-accordion summary::-webkit-details-marker { display: none; }
+    .swi-accordion-body {
+      padding: 14px 18px;
+      font-size: 0.93rem;
+      line-height: 1.6;
+      border-top: 1px solid #e5e9ef;
+    }
+
+    .swi-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 1rem 0 2rem;
+    }
+    .swi-tag {
+      display: inline-block;
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      background: #f5f5f5;
+      color: #000;
+      border: 1px solid #ddd;
+      transition: background 0.15s;
+    }
+    .swi-tag:hover { background: #000; color: #fff; border-color: #000; }
+
+    .swi-author-card {
+      display: flex;
+      gap: 18px;
+      align-items: center;
+      background: #f5f5f5;
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin: 2rem 0;
+    }
+    .swi-author-avatar {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: #000;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 1.1rem;
+      flex-shrink: 0;
+    }
+    .swi-author-info h4 { margin: 0 0 0.3rem; font-size: 1rem; }
+    .swi-author-info h4 a { color: #000; text-decoration: none; font-weight: 600; }
+    .swi-author-info h4 a:hover { text-decoration: underline; }
+    .swi-author-info p { margin: 0; font-size: 0.9rem; color: #666; }
+
+    .swi-related-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 1rem 0 2rem;
+    }
+    .swi-related-card {
+      display: block;
+      padding: 18px 20px;
+      background: #f5f5f5;
+      border-radius: 10px;
+      text-decoration: none;
+      border: 1px solid transparent;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .swi-related-card:hover {
+      border-color: #000;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    }
+    .swi-related-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #888;
+      font-weight: 600;
+    }
+    .swi-related-card h3 {
+      margin: 6px 0 0;
+      font-size: 0.95rem;
+      color: #000;
+      line-height: 1.4;
+      font-weight: 600;
+    }
+
+    @media (max-width: 768px) {
+      .publication-title { font-size: 1.9rem; }
+      .publication-body { font-size: 1rem; }
+      .swi-steps { flex-direction: column; }
+      .swi-step { flex-direction: column; text-align: center; }
+      .swi-step-number { margin-bottom: 0.5rem; }
+      .swi-image-grid { grid-template-columns: 1fr; }
+      .swi-related-grid { grid-template-columns: 1fr; }
+      .swi-author-card { flex-direction: column; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- HERO -->
+<section class="hero" style="padding-top: 1rem;">
+  <div class="hero-body" style="padding-bottom: 0.5rem;">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+          <h1 class="title is-1 publication-title">
+            <span class="swi-gradient">QLoRA: Efficient Finetuning of Quantized LLMs</span>
+          </h1>
+
+          <div class="is-size-5 publication-authors" style="margin-top: 0.6em;">
+            <span class="author-block"><a href="https://arxiv.org/abs/2305.14314">Dettmers et al. (University of Washington)</a></span>
+          </div>
+
+          <div class="is-size-5 publication-authors" style="margin-top: 0.4em;">
+            <span class="publication-venue">arXiv:2305.14314</span>
+          </div>
+
+          <div class="is-size-5 publication-authors" style="margin-top: 0.4em;">
+            <span class="author-block">May 2023</span>
+          </div>
+
+          <div class="column has-text-centered" style="margin-top: 1.2rem;">
+            <div class="publication-links">
+              <span class="link-block">
+                <a href="https://arxiv.org/abs/2305.14314"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon"><i class="fas fa-file-pdf"></i></span>
+                  <span>Paper</span>
+                </a>
+              </span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ABSTRACT (TL;DR) -->
+<section class="section" style="padding-bottom: 0; padding-top: 0;">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <div class="swi-tldr has-text-justified">
+          <p>
+            QLoRA introduces three innovations — 4-bit NormalFloat (NF4) quantization, double quantization, and paged optimizers — that enable fine-tuning 65B parameter models on a single 48GB GPU with no performance degradation versus 16-bit full fine-tuning. The method quantizes base model weights to 4-bit NF4, computes in BF16, and trains LoRA adapters on all transformer layers. The resulting Guanaco 65B model achieves 99.3% of ChatGPT performance on the Vicuna benchmark.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- BODY -->
+<section class="section publication-body" style="padding-top: 1.5rem;">
+  <div class="container is-max-desktop">
+    <div class="content has-text-justified">
+
+      <!-- SECTION 1: Motivation -->
+      <h2 class="title">The Memory Wall: Why QLoRA Exists</h2>
+
+      <p>
+        Before QLoRA, fine-tuning a large language model required loading the full-precision (FP16/BF16) model weights, optimizer states, and gradients into GPU memory. For a 7B parameter model, this requires approximately:
+      </p>
+
+      <pre><code>Memory breakdown for 7B model (FP16):
+
+Model weights:      7B × 2 bytes = 14 GB
+AdamW optimizer m:  7B × 4 bytes = 28 GB
+AdamW optimizer v:  7B × 4 bytes = 28 GB
+Gradients:          7B × 2 bytes = 14 GB
+Activations:        ~2-8 GB (batch dependent)
+─────────────────────────────────────────
+Total:              ~86-92 GB</code></pre>
+
+      <p>
+        For a 65B model, this becomes ~800 GB, requiring at least 10 A100 80GB GPUs. This computational barrier meant that only well-funded labs could fine-tune state-of-the-art models. QLoRA's thesis is that by quantizing the base model weights to 4-bit precision, we can dramatically reduce the memory footprint while preserving the information needed for fine-tuning.
+      </p>
+
+      <div class="swi-pullquote">
+        <p>"4-bit quantization + LoRA is all you need." — The paper's core message. Pre-training remains valuable for the base model, but alignment and fine-tuning can happen in extremely memory-efficient settings.</p>
+      </div>
+
+      <!-- SECTION 2: NF4 Quantization -->
+      <h2 class="title">Innovation 1: 4-bit NormalFloat (NF4)</h2>
+
+      <h3 class="subtitle">Why Standard Quantization Fails for Neural Networks</h3>
+
+      <p>
+        Standard 4-bit quantization methods (FP4, INT4) distribute quantization bins uniformly across the representable range. But neural network weights are not uniformly distributed — they follow an approximately zero-centered normal distribution. This means a uniform quantization wastes bits on the tails (where few values exist) while undersampling the center (where most values cluster).
+      </p>
+
+      <p>
+        NF4 is information-theoretically optimal for normally-distributed data. Instead of uniform bin boundaries, NF4 places quantization boundaries at the quantiles of a standard normal distribution, ensuring each bin contains equal probability mass:
+      </p>
+
+      <pre><code>NF4 Quantization Bins (2^4 = 16 bins):
+
+Bin boundaries for N(0,1):
+
+  Bin  0: [-∞,   -1.792]
+  Bin  1: [-1.792, -1.252]
+  Bin  2: [-1.252, -0.906]
+  Bin  3: [-0.906, -0.623]
+  Bin  4: [-0.623, -0.377]
+  Bin  5: [-0.377, -0.149]
+  Bin  6: [-0.149,  0.071]
+  Bin  7: [ 0.071,  0.306]
+  Bin  8: [ 0.306,  0.547]
+  Bin  9: [ 0.547,  0.806]
+  Bin 10: [ 0.806,  1.084]
+  Bin 11: [ 1.084,  1.390]
+  Bin 12: [ 1.390,  1.742]
+  Bin 13: [ 1.742,  2.168]
+  Bin 14: [ 2.168,  2.733]
+  Bin 15: [ 2.733,  +∞]
+
+Each bin has exactly 1/16 = 6.25% probability mass
+under a standard normal distribution.</code></pre>
+
+      <p>
+        The key insight: by pre-computing these quantile boundaries (assuming the weights are approximately normal after normalization), NF4 can achieve near-lossless 4-bit representation. The quantization error is minimized because each bin contains the same number of weight values, preventing the information loss that occurs when bins are empty or over-populated.
+      </p>
+
+      <h3 class="subtitle">Quantization Process</h3>
+
+      <p>
+        To quantize a weight block W to NF4, the process is:
+      </p>
+
+      <pre><code>1. Absmax normalization:
+   W_norm = W / max(|W|)
+
+2. Map each value to nearest NF4 bin index:
+   quantized[i] = argmin_j |W_norm[i] - NF4_boundary[j]|
+
+3. Store: quantized[i] (4-bit) + absmax scale factor (FP16)
+   per block of 64 weights
+
+4. To dequantize: W_approx = NF4_boundary[quantized[i]] × absmax</code></pre>
+
+      <p>
+        The NF4 quantization is strictly superior to FP4 for neural network weights. In experiments, NF4 reduces the quantization error by 10-15% compared to FP4 on the same bit width, primarily because it better matches the distribution of pre-trained weights.
+      </p>
+
+      <!-- SECTION 3: Double Quantization -->
+      <h2 class="title">Innovation 2: Double Quantization</h2>
+
+      <p>
+        In block-wise quantization, each block of 64 weights requires one FP32 scale factor (the "absmax" constant). This adds 32/64 = 0.5 bits per parameter of overhead — significant when trying to achieve 4-bit precision. Double quantization treats these scale factors themselves as a quantization problem:
+      </p>
+
+      <pre><code>Standard 4-bit quantization:
+  Quantized weights: 4 bits/param
+  FP32 scale factors: 32 bits / 64 weights = 0.5 bits/param
+  Total: 4.5 bits/param
+
+Double quantization:
+  Quantized weights: 4 bits/param
+  FP32 scales → quantized to FP8 (8-bit): 8 bits / 64 weights = 0.125 bits/param
+  FP8 scale factors for FP8 scales: ~0.008 bits/param
+  Total: 4.13 bits/param
+
+  Savings: 0.37 bits/param = ~3 GB for a 65B model</code></pre>
+
+      <p>
+        The double quantization process works in two levels: first, the original FP32 scale factors are grouped into blocks of 256 and quantized to 8-bit floating point. Second, the scale factors for those 8-bit values are stored in FP32. This hierarchical approach saves approximately 0.37 bits per parameter compared to standard quantization, which translates to roughly 3 GB for a 65B model — a non-trivial savings when GPU memory is the bottleneck.
+      </p>
+
+      <!-- SECTION 4: Paged Optimizers -->
+      <h2 class="title">Innovation 3: Paged Optimizers</h2>
+
+      <p>
+        Gradient checkpointing is essential for fine-tuning large models — it trades compute for memory by recomputing activations during the backward pass instead of storing them. However, gradient checkpointing can cause memory spikes during the backward pass when large activation tensors are temporarily materialized. These spikes can exceed GPU memory even when the steady-state usage is within budget.
+      </p>
+
+      <p>
+        Paged optimizers leverage NVIDIA's unified memory architecture (available on A100 and later GPUs) to handle these spikes gracefully:
+      </p>
+
+      <pre><code>Without paged optimizers:
+  GPU Memory: [model | optimizer | activations]
+  During backward: activation spike → OOM crash!
+
+With paged optimizers:
+  GPU Memory: [model | optimizer | activations]
+  During backward: activation spike detected
+    → optimizer states "paged out" to CPU memory
+    → activation space freed
+    → backward pass completes
+    → optimizer states paged back in</code></pre>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">🧠</div>
+        <div class="swi-callout-body">
+          <strong>How it works:</strong> When CUDA detects that a memory allocation would exceed GPU capacity, NVIDIA's unified memory system automatically pages the oldest/least-recently-used data to CPU RAM. The optimizer states (AdamW's m and v tensors) are the ideal candidates for paging because they are only needed during the optimizer update step, not during the forward or backward pass. This is transparent to the training code — no manual memory management is required.
+        </div>
+      </div>
+
+      <!-- SECTION 5: The QLoRA Formula -->
+      <h2 class="title">The Complete QLoRA Formula</h2>
+
+      <p>
+        Combining all three innovations, the QLoRA forward pass operates on 4-bit quantized weights while computing in BF16:
+      </p>
+
+      <pre><code>QLoRA Forward Pass:
+
+Y_BF16 = X_BF16 · doubleDequant(c₁, c₂, W_NF4) + X_BF16 · L₁ · L₂
+
+Where:
+  X_BF16:          Input activations (BF16)
+  W_NF4:           Quantized base weights (4-bit NF4)
+  doubleDequant:   Dequantize NF4 → FP32 using double-quantized scales
+  c₁:             First-level quantization constants (FP8)
+  c₂:             Second-level quantization constant (FP32)
+  L₁:             LoRA low-rank matrix A (BF16, rank r)
+  L₂:             LoRA low-rank matrix B (BF16, rank r)
+
+Key: The base weight computation uses 4-bit storage
+     but BF16 compute — no precision loss in the
+     forward/backward pass.</code></pre>
+
+      <p>
+        The critical distinction is that while weights are <em>stored</em> in 4-bit NF4 format, they are <em>dequantized</em> to BF16 for the actual matrix multiplication. This means the computation itself has full BF16 precision — the quantization only affects memory storage, not numerical computation. The gradients, however, are computed with respect to the LoRA parameters only, which remain in BF16 throughout.
+      </p>
+
+      <!-- SECTION 6: Adapter Placement -->
+      <h2 class="title">Critical Finding: Adapter Placement Matters</h2>
+
+      <p>
+        One of QLoRA's most important findings contradicts the original LoRA paper (see [Paper 06]). While the original LoRA recommended applying adapters only to attention layers (W<sub>q</sub> + W<sub>v</sub>), QLoRA discovers that this recommendation does <strong>not</strong> hold when the base model is quantized:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>LoRA Configuration</th><th>Non-Quantized (FP16)</th><th>QLoRA (4-bit NF4)</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>W<sub>q</sub> only</td><td>72.1</td><td>69.8</td></tr>
+          <tr><td>W<sub>q</sub> + W<sub>v</sub></td><td>73.4</td><td>71.2</td></tr>
+          <tr><td>All attention (q,k,v,o)</td><td>73.2</td><td>72.5</td></tr>
+          <tr><td class="swi-win">All layers (attn + MLP)</td><td>73.3</td><td class="swi-win">73.4</td></tr>
+        </tbody>
+      </table>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">⚠️</div>
+        <div class="swi-callout-body">
+          <strong>Critical difference from LoRA [Paper 06]:</strong> In the non-quantized setting, attention-only adapters match full adapter placement. But with 4-bit quantization, applying LoRA to ALL layers — including MLP — is essential for matching 16-bit fine-tuning quality. The quantization noise in the base weights means that the adapters need to compensate across the entire model, not just the attention mechanism. This is one of QLoRA's most practically important findings.
+        </div>
+      </div>
+
+      <!-- SECTION 7: Guanaco Results -->
+      <h2 class="title">Guanaco: The Proof of Concept</h2>
+
+      <p>
+        The authors train Guanaco models on the OASST1 (Open Assistant) dataset, a community-curated collection of assistant-style conversations. The results are remarkable:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>Model</th><th>Size</th><th>GPU Memory</th><th>Training Time</th><th>Vicuna Score</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Guanaco (QLoRA)</td><td>7B</td><td class="swi-win">5 GB</td><td>24 hours</td><td>73.4</td></tr>
+          <tr><td>Guanaco (QLoRA)</td><td>13B</td><td>10 GB</td><td>24 hours</td><td>77.8</td></tr>
+          <tr><td>Guanaco (QLoRA)</td><td>33B</td><td>21 GB</td><td>48 hours</td><td>84.1</td></tr>
+          <tr><td class="swi-win">Guanaco (QLoRA)</td><td class="swi-win">65B</td><td>42 GB</td><td>72 hours</td><td class="swi-win">99.3</td></tr>
+          <tr><td>Alpaca (full FT)</td><td>7B</td><td>26 GB</td><td>48 hours</td><td>57.4</td></tr>
+          <tr><td>ChatGPT (reference)</td><td>—</td><td>—</td><td>—</td><td>100.0</td></tr>
+        </tbody>
+      </table>
+
+      <div class="swi-pullquote">
+        <p>"Guanaco 65B achieves 99.3% of ChatGPT performance on the Vicuna benchmark while being trained on a single 48GB GPU in 24 hours. The 7B Guanaco model achieves 73.4% with only 5GB of GPU memory — less than the memory required for a 7B Alpaca model at 26GB, while outperforming it by over 16 points."</p>
+      </div>
+
+      <h3 class="subtitle">Dataset Quality vs. Quantity</h3>
+
+      <p>
+        A striking finding is that dataset quality matters far more than scale. The Guanaco models are trained on OASST1, which contains only ~9,000 high-quality examples. Yet this outperforms models trained on much larger but lower-quality datasets:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>Dataset</th><th>Size</th><th>Guanaco 65B Score</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>OASST1 (top level)</td><td>9K</td><td class="swi-win">95.3</td><td>Community-curated, high quality</td></tr>
+          <tr><td>OASST1 (all levels)</td><td>161K</td><td>97.8</td><td>Includes deeper conversation trees</td></tr>
+          <tr><td>FLAN v2</td><td>450K</td><td>67.1</td><td>Task-oriented, not conversational</td></tr>
+          <tr><td>Alpaca</td><td>52K</td><td>73.4</td><td>GPT-3.5 generated, mixed quality</td></tr>
+          <tr><td>ShareGPT</td><td>90K</td><td>91.4</td><td>User-shared ChatGPT conversations</td></tr>
+        </tbody>
+      </table>
+
+      <p>
+        This finding connects directly to [Paper 08] (LIMA), which makes the same argument with even more extreme data efficiency — 1,000 curated examples matching GPT-4 quality. Together, these papers establish a principle that data quality dominates data quantity for alignment training.
+      </p>
+
+      <!-- SECTION 8: Evaluation Insights -->
+      <h2 class="title">Evaluation: GPT-4 as a Proxy</h2>
+
+      <p>
+        The paper uses GPT-4 as an evaluation proxy, comparing model outputs side-by-side and asking GPT-4 to select the better response. This raises the question of reliability. The authors find:
+      </p>
+
+      <pre><code>GPT-4 vs. Human Agreement (Kendall τ):
+
+  GPT-4 vs. Human rankings: τ = 0.43 (p < 0.001)
+  GPT-4 vs. ChatGPT rankings: τ = 0.55 (p < 0.001)
+
+  Interpretation: Moderate but significant agreement.
+  GPT-4 can distinguish model quality but is not
+  a perfect proxy for human judgment.</code></pre>
+
+      <p>
+        The moderate correlation (τ = 0.43) suggests that while GPT-4 evaluation is useful for ranking models, it should not be treated as a ground truth for absolute quality. The authors are careful to supplement GPT-4 evaluation with human studies where possible.
+      </p>
+
+      <h3 class="subtitle">Qualitative Analysis</h3>
+
+      <p>
+        The paper provides qualitative examples of Guanaco's strengths and weaknesses:
+      </p>
+
+      <div class="swi-steps">
+        <div class="swi-step">
+          <div class="swi-step-number">✓</div>
+          <div class="swi-step-content">
+            <h4>Resists Misinformation</h4>
+            <p>When prompted with false premises (e.g., "Why is the sky green?"), Guanaco correctly identifies the incorrect assumption and provides accurate information, unlike many other fine-tuned models.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">✓</div>
+          <div class="swi-step-content">
+            <h4>Theory of Mind</h4>
+            <p>Guanaco demonstrates understanding of mental states in others — correctly reasoning about what different characters in a scenario know or believe, a capability that requires sophisticated social reasoning.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">✗</div>
+          <div class="swi-step-content">
+            <h4>Mathematical Reasoning</h4>
+            <p>Like most language models, Guanaco struggles with multi-step mathematical reasoning, particularly when the problem requires formal proof structures or complex arithmetic.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 9: Ablations -->
+      <h2 class="title">Ablation Studies</h2>
+
+      <details class="swi-accordion">
+        <summary>NF4 vs. FP4 vs. INT4</summary>
+        <div class="swi-accordion-body">
+          <p>NF4 consistently outperforms FP4 across all model sizes and tasks. For a 7B model fine-tuned on OpenWebText, NF4 achieves perplexity 12.21 vs. FP4's 12.89 — a significant gap for 4-bit quantization. INT4 performs even worse (13.12) because it assumes integer-valued data, which doesn't match the floating-point distribution of neural network weights. The advantage of NF4 comes from its information-theoretic optimality for normally-distributed data, which is precisely the distribution of pre-trained weights after standard normalization.</p>
+        </div>
+      </details>
+
+      <details class="swi-accordion">
+        <summary>Double Quantization Impact</summary>
+        <div class="swi-accordion-body">
+          <p>Double quantization saves 0.37 bits per parameter (3 GB for 65B) with negligible performance impact. The dequantization error from double quantization is approximately 0.001% of the original weight magnitude, well below the noise floor introduced by NF4 quantization itself. This makes double quantization essentially free memory savings — always worth enabling.</p>
+        </div>
+      </details>
+
+      <details class="swi-accordion">
+        <summary>Paged Optimizers</summary>
+        <div class="swi-accordion-body">
+          <p>Paged optimizers prevent OOM crashes during gradient checkpointing without affecting training speed in the common case. When GPU memory is sufficient, the unified memory mechanism is not invoked, and there is zero overhead. When memory is tight, the optimizer states are transparently paged to CPU RAM and back, adding only a few percent to total training time. This is a safety net, not a performance optimization — it prevents failures that would otherwise require reducing batch size or sequence length.</p>
+        </div>
+      </details>
+
+      <details class="swi-accordion">
+        <summary>QLoRA vs. 16-bit LoRA</summary>
+        <div class="swi-accordion-body">
+          <p>QLoRA matches 16-bit LoRA performance across all evaluated model sizes (7B, 13B, 33B, 65B). The average performance difference is less than 0.1% on benchmarks. This is the paper's central claim: 4-bit quantization + LoRA achieves the same quality as full 16-bit fine-tuning, but with 3-4× less memory. The key requirement is that LoRA adapters must be applied to ALL layers when using quantization — attention-only placement (as recommended by the original LoRA paper) degrades performance by 2-3% in the quantized setting.</p>
+        </div>
+      </details>
+
+      <!-- SECTION 10: Limitations -->
+      <h2 class="title">Limitations</h2>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">⚠️</div>
+        <div class="swi-callout-body">
+          <ul style="margin: 0; padding-left: 1.2rem;">
+            <li><strong>Dequantization overhead:</strong> The double dequantization step adds computational overhead during the forward pass. For very large models, this can add 5-10% to training time compared to BF16 training.</li>
+            <li><strong>Evaluation proxy:</strong> GPT-4 based evaluation has moderate correlation with human judgment (τ = 0.43), introducing uncertainty in the reported performance comparisons.</li>
+            <li><strong>Dataset dependency:</strong> The Guanaco results are heavily dependent on OASST1 quality. The paper does not systematically explore whether QLoRA degrades more on lower-quality datasets.</li>
+            <li><strong>Limited to adapter-based PEFT:</strong> QLoRA's quantization-aware approach is specifically designed for LoRA-style methods. Other PEFT approaches (prefix tuning, prompt tuning) may not benefit from the same quantization strategy.</li>
+            <li><strong>No pre-training from scratch:</strong> QLoRA only addresses fine-tuning. The pre-trained base model must still be obtained separately and at full precision.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- SECTION 11: Practical Implications -->
+      <h2 class="title">Practical Implications and Legacy</h2>
+
+      <p>
+        QLoRA democratized large model fine-tuning. Before QLoRA, fine-tuning a 65B model required a multi-GPU cluster costing thousands of dollars per hour. After QLoRA, a single consumer-grade GPU (RTX 3090, RTX 4090) suffices for models up to 13B, and a single A100 handles 65B. This has had cascading effects across the entire LLM ecosystem:
+      </p>
+
+      <ul>
+        <li><strong>Zephyr ([Paper 11]):</strong> Used QLoRA as the foundation for their dSFT and dDPO pipeline, enabling the creation of a 7B model that surpasses Llama2-Chat-70B on MT-Bench.</li>
+        <li><strong>ORPO ([Paper 12]):</strong> The monolithic SFT + preference optimization loss is typically implemented with QLoRA for practical deployment, combining the efficiency of ORPO with the memory savings of QLoRA.</li>
+        <li><strong>Open-source fine-tuning:</strong> Most open-source fine-tuning workflows (Hugging Face PEFT, Unsloth, Axolotl) use QLoRA as the default training mode for models above 7B parameters.</li>
+        <li><strong>Data quality emphasis:</strong> The Guanaco results reinforced the data quality > data quantity principle established by LIMA ([Paper 08]) and Phi ([Paper 03]).</li>
+      </ul>
+
+      <div class="swi-tags">
+        <span class="swi-tag">4-bit Quantization</span>
+        <span class="swi-tag">NF4</span>
+        <span class="swi-tag">Double Quantization</span>
+        <span class="swi-tag">Paged Optimizers</span>
+        <span class="swi-tag">All-Layer Adapters</span>
+        <span class="swi-tag">Memory-Efficient Fine-Tuning</span>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

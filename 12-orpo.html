@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ORPO: Monolithic Preference Optimization without Reference Model</title>
+  <meta name="description" content="Deep analysis of ORPO — a single-stage alignment method that merges SFT and preference optimization via odds-ratio contrastive learning, eliminating the reference model entirely.">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Noto+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --swi-ink:    #000000;
+      --swi-muted:  #666;
+      --swi-tldr-bg:#f5f5f5;
+      --swi-link:   #000;
+    }
+
+    body {
+      font-family: 'Noto Sans', sans-serif;
+      color: #000;
+      background: #ffffff;
+    }
+
+    .publication-body a {
+      color: #000;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+    }
+    .publication-body a:hover { border-bottom-color: #000; }
+    .publication-body strong { color: #000; }
+
+    .swi-gradient {
+      background: linear-gradient(90deg, #d4380d, #fa541c, #fa8c16);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-weight: bold;
+    }
+
+    .publication-title {
+      font-family: 'Google Sans', sans-serif;
+      font-size: 2.6rem;
+      line-height: 1.15;
+      letter-spacing: -0.01em;
+      font-weight: 700;
+    }
+    .publication-authors {
+      font-family: 'Google Sans', sans-serif;
+      color: #666;
+      font-size: 1.05rem;
+    }
+    .publication-authors a {
+      color: #000 !important;
+      font-weight: 600;
+    }
+    .publication-authors a:hover { text-decoration: underline; }
+    .author-block { display: inline-block; }
+    .publication-venue {
+      color: #666;
+      font-weight: bold;
+      width: fit-content;
+    }
+
+    .link-block a { margin: 6px 8px; }
+
+    .swi-tldr {
+      background-color: #f5f5f5;
+      border-radius: 10px;
+      padding: 18px 22px;
+      font-family: 'Google Sans', sans-serif;
+      font-size: 1.02rem;
+      line-height: 1.55;
+      max-width: 112%;
+      margin: 10px auto;
+    }
+
+    .swi-caption {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      max-width: 97%;
+      margin: 0.4em auto 0 auto;
+      color: #333;
+    }
+
+    .section h2.title {
+      font-family: 'Google Sans', sans-serif;
+      font-size: 1.85rem;
+      color: #000;
+      font-weight: 700;
+    }
+    .section h3.subtitle,
+    .section h3.title {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 1.25rem;
+      color: #000;
+      font-weight: 600;
+      margin-top: 1.5rem;
+    }
+
+    .publication-body {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 1.08rem;
+      line-height: 1.7;
+      color: #111;
+    }
+    .publication-body p { margin-bottom: 1.1rem; }
+    .publication-body code {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 0.92em;
+      background: #f5f5f5;
+      padding: 0.1em 0.4em;
+      border-radius: 4px;
+      color: #111;
+      font-weight: 500;
+    }
+    .publication-body pre {
+      background: #111;
+      color: #eee;
+      padding: 16px 20px;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
+    .publication-body pre code {
+      background: transparent;
+      color: inherit;
+      padding: 0;
+    }
+
+    .swi-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: 'Google Sans', sans-serif;
+      font-size: 0.95rem;
+      margin: 1.5rem 0;
+    }
+    .swi-table th, .swi-table td {
+      padding: 12px 16px;
+      text-align: left;
+    }
+    .swi-table th {
+      font-weight: 700;
+      color: #000;
+      border-bottom: 2px solid #000;
+    }
+    .swi-table td {
+      border-bottom: 1px solid #eee;
+    }
+    .swi-table tr:last-child td { border-bottom: none; }
+    .swi-table td:first-child { font-weight: 600; }
+    .swi-table-striped tbody tr:nth-child(even) { background: #fafafa; }
+
+    .swi-win { font-weight: 700; }
+
+    .swi-paginate {
+      border-top: 1px solid #e5e9ef;
+      margin-top: 3rem;
+      padding-top: 1.5rem;
+      font-family: 'Google Sans', sans-serif;
+      font-size: 0.95rem;
+    }
+    .swi-paginate a { color: #000; }
+
+    .swi-callout {
+      display: flex;
+      gap: 14px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin: 1.5rem 0;
+    }
+    .swi-callout-icon { font-size: 1.4rem; flex-shrink: 0; }
+    .swi-callout-body { font-size: 0.97rem; line-height: 1.6; }
+
+    .swi-pullquote {
+      margin: 2rem 0;
+      padding: 16px 24px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      font-style: italic;
+      font-size: 1.1rem;
+      line-height: 1.65;
+      color: #333;
+    }
+    .swi-pullquote p { margin: 0; }
+
+    .swi-steps {
+      display: flex;
+      gap: 20px;
+      margin: 1.5rem 0;
+    }
+    .swi-step {
+      flex: 1;
+      display: flex;
+      gap: 12px;
+      background: #f5f5f5;
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .swi-step-number {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #000;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+      flex-shrink: 0;
+    }
+    .swi-step-content h4 {
+      font-size: 0.95rem;
+      margin-bottom: 0.3rem;
+      color: #000;
+    }
+    .swi-step-content p {
+      font-size: 0.88rem;
+      line-height: 1.45;
+      color: #555;
+      margin: 0;
+    }
+
+    .swi-image-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 1.5rem 0;
+    }
+    .swi-figure { margin: 0; }
+    .swi-image-placeholder {
+      background: #f0f0f0;
+      border-radius: 10px;
+      aspect-ratio: 4/3;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      color: #999;
+      font-size: 0.85rem;
+      border: 2px dashed #ddd;
+    }
+    .swi-image-icon { font-size: 1.6rem; }
+    .swi-figure figcaption {
+      font-size: 0.82rem;
+      color: #777;
+      margin-top: 6px;
+      text-align: center;
+    }
+
+    .swi-accordion {
+      border: 1px solid #e5e9ef;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      overflow: hidden;
+    }
+    .swi-accordion summary {
+      padding: 14px 18px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.97rem;
+      background: #f5f5f5;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #000;
+    }
+    .swi-accordion summary::before {
+      content: "▸";
+      transition: transform 0.2s;
+      font-size: 0.8rem;
+      color: #000;
+    }
+    .swi-accordion[open] summary::before { transform: rotate(90deg); }
+    .swi-accordion summary::-webkit-details-marker { display: none; }
+    .swi-accordion-body {
+      padding: 14px 18px;
+      font-size: 0.93rem;
+      line-height: 1.6;
+      border-top: 1px solid #e5e9ef;
+    }
+
+    .swi-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 1rem 0 2rem;
+    }
+    .swi-tag {
+      display: inline-block;
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      background: #f5f5f5;
+      color: #000;
+      border: 1px solid #ddd;
+      transition: background 0.15s;
+    }
+    .swi-tag:hover { background: #000; color: #fff; border-color: #000; }
+
+    .swi-author-card {
+      display: flex;
+      gap: 18px;
+      align-items: center;
+      background: #f5f5f5;
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin: 2rem 0;
+    }
+    .swi-author-avatar {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: #000;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 1.1rem;
+      flex-shrink: 0;
+    }
+    .swi-author-info h4 { margin: 0 0 0.3rem; font-size: 1rem; }
+    .swi-author-info h4 a { color: #000; text-decoration: none; font-weight: 600; }
+    .swi-author-info h4 a:hover { text-decoration: underline; }
+    .swi-author-info p { margin: 0; font-size: 0.9rem; color: #666; }
+
+    .swi-related-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 1rem 0 2rem;
+    }
+    .swi-related-card {
+      display: block;
+      padding: 18px 20px;
+      background: #f5f5f5;
+      border-radius: 10px;
+      text-decoration: none;
+      border: 1px solid transparent;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .swi-related-card:hover {
+      border-color: #000;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    }
+    .swi-related-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #888;
+      font-weight: 600;
+    }
+    .swi-related-card h3 {
+      margin: 6px 0 0;
+      font-size: 0.95rem;
+      color: #000;
+      line-height: 1.4;
+      font-weight: 600;
+    }
+
+    @media (max-width: 768px) {
+      .publication-title { font-size: 1.9rem; }
+      .publication-body { font-size: 1rem; }
+      .swi-steps { flex-direction: column; }
+      .swi-step { flex-direction: column; text-align: center; }
+      .swi-step-number { margin-bottom: 0.5rem; }
+      .swi-image-grid { grid-template-columns: 1fr; }
+      .swi-related-grid { grid-template-columns: 1fr; }
+      .swi-author-card { flex-direction: column; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- HERO -->
+<section class="hero" style="padding-top: 1rem;">
+  <div class="hero-body" style="padding-bottom: 0.5rem;">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+          <h1 class="title is-1 publication-title">
+            <span class="swi-gradient">ORPO: Monolithic Preference Optimization without Reference Model</span>
+          </h1>
+
+          <div class="is-size-5 publication-authors" style="margin-top: 0.6em;">
+            <span class="author-block"><a href="https://arxiv.org/abs/2403.07691">Jiwoo Hong, Alexander Lee, et al.</a></span>
+          </div>
+
+          <div class="is-size-5 publication-authors" style="margin-top: 0.4em;">
+            <span class="publication-venue">arXiv:2403.07691</span>
+          </div>
+
+          <div class="is-size-5 publication-authors" style="margin-top: 0.4em;">
+            <span class="author-block">March 2024</span>
+          </div>
+
+          <div class="column has-text-centered" style="margin-top: 1.2rem;">
+            <div class="publication-links">
+              <span class="link-block">
+                <a href="https://arxiv.org/abs/2403.07691"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon"><i class="fas fa-file-pdf"></i></span>
+                  <span>Paper</span>
+                </a>
+              </span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ABSTRACT (TL;DR) -->
+<section class="section" style="padding-bottom: 0; padding-top: 0;">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <div class="swi-tldr has-text-justified">
+          <p>
+            Standard RLHF pipelines separate supervised fine-tuning (SFT) from preference optimization — first training on demonstrations, then using a reward model or contrastive loss (like DPO) to align the model further. ORPO collapses both stages into a single monolithic objective: <code>L<sub>ORPO</sub> = L<sub>SFT</sub> + λ · L<sub>OR</sub></code>, where <code>L<sub>OR</sub></code> is a novel odds-ratio-based contrastive loss. This eliminates the need for a frozen reference model, halves the number of forward passes per training step, and produces competitive alignment results — all while remaining mathematically elegant. The key insight is that odds ratios (not raw probability ratios) provide a milder, more stable form of discrimination between chosen and rejected responses, preventing the over-suppression that plagues other methods.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- BODY -->
+<section class="section publication-body" style="padding-top: 1.5rem;">
+  <div class="container is-max-desktop">
+    <div class="content has-text-justified">
+
+      <!-- Tags -->
+      <div class="swi-tags">
+        <span class="swi-tag">Preference Optimization</span>
+        <span class="swi-tag">Odds Ratio</span>
+        <span class="swi-tag">Reference-Free</span>
+        <span class="swi-tag">Single-Stage Training</span>
+        <span class="swi-tag">Alignment</span>
+        <span class="swi-tag">Contrastive Loss</span>
+        <span class="swi-tag">RLHF Alternative</span>
+        <span class="swi-tag">DPO Comparison</span>
+      </div>
+
+      <!-- ============================================ -->
+      <!-- 1. THE PROBLEM -->
+      <!-- ============================================ -->
+      <h2 class="title">The Problem: SFT Increases Probability of Everything</h2>
+
+      <p>
+        To understand why ORPO exists, we first need to understand a subtle but critical flaw in how standard supervised fine-tuning interacts with preference optimization. When you train a language model on a chosen (preferred) response using the standard cross-entropy loss <code>L<sub>SFT</sub></code>, the model learns to assign higher probability to <em>all</em> tokens in that response. This is fine — you want the model to generate the chosen response. But here is the problem: the cross-entropy loss does not simultaneously learn what <em>not</em> to generate.
+      </p>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">⚠️</div>
+        <div class="swi-callout-body">
+          <strong>The core issue:</strong> Standard SFT increases the probability of <em>both</em> chosen <em>and</em> rejected responses (since both are valid language), while providing zero signal about which one is preferred. This creates a blind spot that preference optimization methods must later correct — often at the cost of additional training stages and reference models.
+        </div>
+      </div>
+
+      <p>
+        Consider what happens in the standard two-stage pipeline. First, you fine-tune on demonstrations using <code>L<sub>SFT</sub></code>, which raises the model's probability for all training responses — chosen and rejected alike. Then you apply DPO (Direct Preference Optimization), which introduces a reference model <code>π<sub>ref</sub></code> — a frozen copy of the SFT checkpoint — to anchor the preference gradients. DPO uses a probability ratio <code>π(y<sub>w</sub>)/π(y<sub>l</sub>)</code> to push up the chosen response and push down the rejected one, relative to this reference.
+      </p>
+
+      <p>
+        This two-stage process is wasteful in several ways. First, it requires training twice: once for SFT, then again for DPO. Second, DPO requires storing and running inference through a frozen reference model, doubling both memory and compute per training step. Third, the probability ratio used in DPO can be overly aggressive — it can drive the probability of rejected responses down too far, too fast, causing what the authors call "over-suppression" or over-optimization.
+      </p>
+
+      <div class="swi-pullquote">
+        <p>"Why not simply merge supervised fine-tuning and preference optimization into a single training objective that jointly learns the demonstrations and the preference signal?"</p>
+      </div>
+
+      <p>
+        This is exactly the question ORPO answers. The insight is that if you can design a preference loss that <em>naturally</em> interacts with the SFT loss — rather than fighting against it or requiring a reference anchor — you can collapse both stages into one. The key to making this work is choosing the right mathematical formulation for the preference signal. And that is where odds ratios enter the picture.
+      </p>
+
+      <!-- ============================================ -->
+      <!-- 2. THE ORPO OBJECTIVE -->
+      <!-- ============================================ -->
+      <h2 class="title">The ORPO Objective: A Monolithic Formulation</h2>
+
+      <p>
+        ORPO's training objective is deceptively simple. The total loss for a single training example with a chosen response <code>y<sub>w</sub></code> and rejected response <code>y<sub>l</sub></code> is:
+      </p>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">📐</div>
+        <div class="swi-callout-body">
+          <strong>ORPO Loss:</strong> <code>L<sub>ORPO</sub> = L<sub>SFT</sub> + λ · L<sub>OR</sub></code><br><br>
+          Where <code>L<sub>SFT</sub></code> is the standard cross-entropy loss on the chosen response, <code>L<sub>OR</sub></code> is the odds-ratio contrastive loss, and <code>λ</code> is a weighting hyperparameter that controls the tradeoff between instruction-following and preference alignment.
+        </div>
+      </div>
+
+      <p>
+        <code>L<sub>SFT</sub></code> is the familiar negative log-likelihood of the chosen response: <code>−log π<sub>θ</sub>(y<sub>w</sub> | x)</code>. It teaches the model to generate the preferred response. The novel component is <code>L<sub>OR</sub></code>, which introduces the preference signal directly into the same objective without needing a reference model.
+      </p>
+
+      <h3 class="subtitle">The Odds Ratio Formulation</h3>
+
+      <p>
+        Before diving into <code>L<sub>OR</sub></code>, let's define the building blocks. For a given response, the model assigns a probability <code>p</code>. From this, we derive the <em>odds</em>:
+      </p>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">🔢</div>
+        <div class="swi-callout-body">
+          <strong>Odds:</strong> <code>odds(y) = P(y) / (1 − P(y))</code><br><br>
+          This transforms the probability from the [0, 1] interval to [0, ∞). If the model assigns 90% probability, the odds are 9. If it assigns 50%, the odds are 1. If it assigns 10%, the odds are 0.111.
+        </div>
+      </div>
+
+      <p>
+        The odds ratio between chosen and rejected responses is then:
+      </p>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">⚖️</div>
+        <div class="swi-callout-body">
+          <strong>Odds Ratio (OR):</strong> <code>OR = odds(y<sub>w</sub>) / odds(y<sub>l</sub>)</code><br><br>
+          where <code>odds(y<sub>w</sub>) = π<sub>θ</sub>(y<sub>w</sub>|x) / (1 − π<sub>θ</sub>(y<sub>w</sub>|x))</code> and similarly for <code>odds(y<sub>l</sub>)</code>. The log-odds ratio is <code>log(OR) = log(odds(y<sub>w</sub>)) − log(odds(y<sub>l</sub>))</code>.
+        </div>
+      </div>
+
+      <p>
+        The odds-ratio preference loss is then defined as the negative log-sigmoid of the log-odds ratio:
+      </p>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">🎯</div>
+        <div class="swi-callout-body">
+          <strong>Odds-Ratio Loss:</strong> <code>L<sub>OR</sub> = −log σ(log OR)</code><br><br>
+          Where <code>σ</code> is the sigmoid function. This loss is minimized when the chosen response has higher odds than the rejected response, penalizing configurations where the rejected response's odds dominate.
+        </div>
+      </div>
+
+      <p>
+        Notice the structural similarity to DPO's loss, which is <code>−log σ(β · log(π(y<sub>w</sub>)/π(y<sub>l</sub>)) + β · log(π<sub>ref</sub>(y<sub>w</sub>)/π<sub>ref</sub>(y<sub>l</sub>)))</code>. The critical difference is that ORPO uses <em>odds ratios</em> instead of <em>probability ratios</em>, and it requires no reference model term at all. The SFT loss on the chosen response acts as the implicit anchor.
+      </p>
+
+      <!-- ============================================ -->
+      <!-- 3. WHY ODDS RATIO -->
+      <!-- ============================================ -->
+      <h2 class="title">Why Odds Ratio over Probability Ratio?</h2>
+
+      <p>
+        This is the paper's most important conceptual contribution, and it goes deeper than a mere mathematical substitution. The choice between odds ratios and probability ratios has profound implications for how aggressively the model discriminates between chosen and rejected responses.
+      </p>
+
+      <h3 class="subtitle">The Over-Suppression Problem</h3>
+
+      <p>
+        In DPO's formulation, the loss depends on the probability ratio <code>π(y<sub>w</sub>)/π(y<sub>l</sub>)</code>. When the model assigns very low probability to the rejected response (say, <code>π(y<sub>l</sub>) → 0</code>), this ratio explodes toward infinity. The gradient then becomes extremely large, driving the model to push the rejected response's probability even lower. This is the over-suppression problem: the model becomes excessively confident that rejected responses should never be generated, which can harm generalization and diversity.
+      </p>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">📊</div>
+        <div class="swi-callout-body">
+          <strong>Empirical Evidence (Figure 6):</strong> The authors show that when using probability ratios, the log probability of rejected responses drops to extremely low values much faster than with odds ratios. The odds-ratio formulation produces a more measured, gradual suppression of rejected responses, preventing the model from becoming overconfident about what <em>not</em> to say.
+        </div>
+      </div>
+
+      <h3 class="subtitle">Milder Discrimination</h3>
+
+      <p>
+        The odds transformation <code>p/(1−p)</code> maps probabilities from [0,1] to [0,∞), but it does so with a <em>milder</em> gradient behavior than raw probability ratios. Consider what happens as the rejected response's probability approaches zero:
+      </p>
+
+      <ul>
+        <li><strong>Probability ratio</strong> <code>π(y<sub>w</sub>)/π(y<sub>l</sub>)</code>: As <code>π(y<sub>l</sub>) → 0</code>, the ratio → ∞. The gradient signal becomes arbitrarily large, creating a runaway feedback loop that over-suppresses.</li>
+        <li><strong>Odds ratio</strong> <code>odds(y<sub>w</sub>)/odds(y<sub>l</sub>)</code>: As <code>π(y<sub>l</sub>) → 0</code>, <code>odds(y<sub>l</sub>) → 0</code> and the odds ratio also → ∞. However, the odds formulation interacts with the SFT loss in a way that provides natural regularization — the SFT loss keeps pushing up <code>π(y<sub>w</sub>)</code>, which bounds the odds ratio from above.</li>
+      </ul>
+
+      <p>
+        More importantly, the sigmoid wrapper <code>σ(log OR)</code> saturates smoothly as the odds ratio grows, providing a natural ceiling on the gradient magnitude. The probability ratio in DPO also uses a sigmoid, but without the reference model term to anchor it, the odds formulation achieves similar stabilization through a different, more computationally efficient mechanism.
+      </p>
+
+      <!-- ============================================ -->
+      <!-- 4. GRADIENT ANALYSIS -->
+      <!-- ============================================ -->
+      <h2 class="title">Gradient Analysis: Adaptive Penalties and Contrastive Signals</h2>
+
+      <p>
+        The paper provides a rigorous gradient analysis that reveals the elegant mechanics of ORPO's training dynamics. When we differentiate the ORPO loss with respect to the model parameters, we get two distinct gradient components that work in concert.
+      </p>
+
+      <h3 class="subtitle">The Adaptive Penalty Term δ(d)</h3>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">⚙️</div>
+        <div class="swi-callout-body">
+          <strong>Adaptive Penalty:</strong> <code>δ(d) = (1 + OR)⁻¹</code><br><br>
+          This term emerges from the gradient of the sigmoid in the odds-ratio loss. When the odds ratio is small (model is confused about which response is better), <code>δ(d)</code> is large — the penalty is strong. When the odds ratio is large (model clearly prefers the chosen response), <code>δ(d) → 0</code> — the penalty naturally diminishes. This creates an <em>adaptive</em> mechanism that allocates more gradient signal to hard examples and less to easy ones.
+        </div>
+      </div>
+
+      <h3 class="subtitle">The Contrastive Gradient h(d)</h3>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">🔄</div>
+        <div class="swi-callout-body">
+          <strong>Contrastive Gradient:</strong> <code>h(d) = ∇<sub>θ</sub> log odds(y<sub>w</sub>) − ∇<sub>θ</sub> log odds(y<sub>l</sub>)</code><br><br>
+          This is the difference in log-odds gradients between the chosen and rejected responses. It simultaneously pushes up the odds of the chosen response and pushes down the odds of the rejected response, but the adaptive penalty <code>δ(d)</code> modulates how strongly this contrastive signal is applied.
+        </div>
+      </div>
+
+      <p>
+        Together, these two components create a training dynamic where the model learns from preference pairs in a self-regulating fashion. Easy pairs (where the model already strongly prefers the chosen response) receive minimal gradient updates, while hard pairs (where the model is uncertain) receive strong corrective gradients. This is similar in spirit to how DPO's <code>β</code> parameter controls the strength of the preference gradient, but ORPO's mechanism is more fine-grained because it adapts per-example rather than using a fixed global scaling.
+      </p>
+
+      <!-- ============================================ -->
+      <!-- 5. ADVANTAGES -->
+      <!-- ============================================ -->
+      <h2 class="title">Advantages: Why ORPO Changes the Game</h2>
+
+      <p>
+        ORPO's design choices yield several concrete practical advantages over existing alignment methods. These advantages compound, making ORPO progressively more attractive as model scale increases.
+      </p>
+
+      <div class="swi-steps">
+        <div class="swi-step">
+          <div class="swi-step-number">1</div>
+          <div class="swi-step-content">
+            <h4>Monolithic Training</h4>
+            <p>Single stage eliminates the SFT → DPO pipeline. No need to first train on demonstrations, then separately train on preference pairs. One optimizer, one set of hyperparameters, one training run.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">2</div>
+          <div class="swi-step-content">
+            <h4>Reference-Free</h4>
+            <p>No frozen reference model means half the memory. For a 7B parameter model, this saves ~14GB of GPU memory (the reference model weights + optimizer states). This is critical for practitioners with limited hardware.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">3</div>
+          <div class="swi-step-content">
+            <h4>Two Forward Passes</h4>
+            <p>ORPO needs only 2 forward passes per training step (one for chosen, one for rejected). DPO requires 4 (policy chosen + policy rejected + ref chosen + ref rejected). This halves the per-step compute cost.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">4</div>
+          <div class="swi-step-content">
+            <h4>Reduced Memory Footprint</h4>
+            <p>No reference model + fewer forward passes = significantly lower peak memory. This makes ORPO feasible on hardware where DPO would require aggressive gradient checkpointing or model parallelism.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================================ -->
+      <!-- 6. RESULTS -->
+      <!-- ============================================ -->
+      <h2 class="title">Results: Competitive Performance at Lower Cost</h2>
+
+      <p>
+        The empirical results demonstrate that ORPO's simplicity does not come at the cost of performance. The headline result is the Mistral-ORPO-β 7B model, which achieves strong benchmarks while using a single training stage.
+      </p>
+
+      <h3 class="subtitle">Mistral-ORPO-β 7B Headline Numbers</h3>
+
+      <table class="swi-table">
+        <thead>
+          <tr>
+            <th>Benchmark</th>
+            <th>Mistral-ORPO-β 7B</th>
+            <th>What It Measures</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>AlpacaEval 2.0</td>
+            <td class="swi-win">12.20%</td>
+            <td>Win rate vs. GPT-4 on open-ended instructions</td>
+          </tr>
+          <tr>
+            <td>MT-Bench</td>
+            <td class="swi-win">7.32</td>
+            <td>Multi-turn conversation quality (1–10 scale)</td>
+          </tr>
+          <tr>
+            <td>IFEval</td>
+            <td class="swi-win">66.19%</td>
+            <td>Instruction following with verifiable constraints</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 class="subtitle">Cross-Method Comparison</h3>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr>
+            <th>Method</th>
+            <th>Model Size</th>
+            <th>Training Stages</th>
+            <th>Ref Model?</th>
+            <th>AlpacaEval</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Llama-2-Chat (RLHF)</td>
+            <td>13B</td>
+            <td>3 (SFT + RM + PPO)</td>
+            <td>Yes</td>
+            <td>—</td>
+          </tr>
+          <tr>
+            <td>Zephyr-β (DPO)</td>
+            <td>7B</td>
+            <td>2 (SFT + DPO)</td>
+            <td>Yes</td>
+            <td>12.80%</td>
+          </tr>
+          <tr>
+            <td>Mistral-ORPO-β</td>
+            <td class="swi-win">7B</td>
+            <td class="swi-win">1 (ORPO)</td>
+            <td class="swi-win">No</td>
+            <td class="swi-win">12.20%</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="swi-pullquote">
+        <p>"ORPO with a single training stage and no reference model achieves results competitive with Llama-2-Chat 13B (trained with a 3-stage RLHF pipeline) and Zephyr-β 7B (trained with DPO). The simplicity advantage is striking."</p>
+      </div>
+
+      <h3 class="subtitle">Scale-Dependent Win Rates</h3>
+
+      <p>
+        One of the paper's most compelling findings is that ORPO's advantage over DPO <em>increases</em> with model size. In head-to-head win rate analysis across model scales:
+      </p>
+
+      <ul>
+        <li><strong>OPT-1.3B:</strong> ORPO achieves up to <strong>70.9% win rate</strong> against DPO in direct comparisons</li>
+        <li><strong>Larger models:</strong> The advantage persists, suggesting that the monolithic formulation becomes increasingly beneficial as models grow</li>
+        <li><strong>Scaling implication:</strong> The memory savings from eliminating the reference model become more significant at scale, making ORPO proportionally more efficient for larger models</li>
+      </ul>
+
+      <p>
+        This scaling behavior makes intuitive sense: as models get larger, the cost of maintaining a frozen reference model grows linearly, while the benefit of the odds-ratio formulation's adaptive regularization also becomes more pronounced (larger models have more capacity to over-optimize, and ORPO's built-in regularization prevents this).
+      </p>
+
+      <!-- ============================================ -->
+      <!-- 7. λ ABLATION -->
+      <!-- ============================================ -->
+      <h2 class="title">The λ Hyperparameter: Balancing SFT and Preference</h2>
+
+      <p>
+        The weighting hyperparameter <code>λ</code> controls the balance between the SFT loss (instruction-following) and the odds-ratio preference loss (alignment). The ablation study reveals a nuanced tradeoff:
+      </p>
+
+      <div class="swi-steps">
+        <div class="swi-step">
+          <div class="swi-step-number">↑</div>
+          <div class="swi-step-content">
+            <h4>Higher λ → Better Open-Ended Tasks</h4>
+            <p>Increasing <code>λ</code> strengthens the preference signal, improving performance on tasks like AlpacaEval where creative, diverse responses are valued. The model learns to better distinguish between good and great responses.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">↓</div>
+          <div class="swi-step-content">
+            <h4>Higher λ → Worse Deterministic Tasks</h4>
+            <p>Over-weighting the preference loss can degrade performance on tasks with a single correct answer (like IFEval), where the SFT signal should dominate. Too much preference optimization can make the model less precise on constrained tasks.</p>
+          </div>
+        </div>
+      </div>
+
+      <p>
+        The optimal <code>λ</code> therefore depends on the target application. For chat and creative writing, a higher <code>λ</code> (e.g., 0.1–0.5) is beneficial. For instruction-following with strict constraints, a lower <code>λ</code> (e.g., 0.01–0.1) preserves the SFT accuracy while adding a mild preference signal. This is analogous to how DPO's <code>β</code> parameter controls the strength of the KL penalty, but ORPO's <code>λ</code> is more interpretable because it directly weights the preference loss against the SFT loss.
+      </p>
+
+      <!-- ============================================ -->
+      <!-- 8. REWARD DISTRIBUTION SHIFT -->
+      <!-- ============================================ -->
+      <h2 class="title">Reward Distribution Shift (Figure 5)</h2>
+
+      <p>
+        The authors analyze how ORPO changes the model's implicit reward distribution — the distribution of scores the model assigns to different responses. Figure 5 in the paper illustrates a key finding: ORPO shifts the reward distribution more smoothly and with less mode collapse than DPO.
+      </p>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">📈</div>
+        <div class="swi-callout-body">
+          <strong>Reward Distribution Insight:</strong> DPO tends to create a bimodal distribution where the model is extremely confident about chosen responses and extremely negative about rejected ones — a signature of over-suppression. ORPO's odds-ratio formulation produces a more Gaussian-like shift, preserving more nuance in the model's assessment of response quality.
+        </div>
+      </div>
+
+      <p>
+        This smoother reward distribution has practical implications. A model with a bimodal reward distribution is more brittle — it makes extreme judgments that don't generalize well to out-of-distribution inputs. ORPO's smoother distribution means the model retains the ability to make fine-grained distinctions between responses that are merely acceptable versus truly excellent.
+      </p>
+
+      <!-- ============================================ -->
+      <!-- 9. LEXICAL DIVERSITY -->
+      <!-- ============================================ -->
+      <h2 class="title">Lexical Diversity: A Surprising Tradeoff</h2>
+
+      <p>
+        The paper reports an interesting finding about how ORPO affects the diversity of generated text. Lexical diversity — measured by metrics like distinct-n or type-token ratio — shows a two-layered pattern:
+      </p>
+
+      <div class="swi-steps">
+        <div class="swi-step">
+          <div class="swi-step-number">↓</div>
+          <div class="swi-step-content">
+            <h4>Per-Input Diversity: Lower</h4>
+            <p>For a single input, ORPO-trained models tend to generate less diverse responses than SFT-only models. The preference loss encourages convergence toward the "best" response style, reducing within-input variation.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">↑</div>
+          <div class="swi-step-content">
+            <h4>Across-Input Diversity: Higher</h4>
+            <p>Across different inputs, ORPO-trained models actually show <em>higher</em> diversity. The preference signal encourages the model to adapt its style to the specific requirements of each prompt, rather than defaulting to a single generation mode.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="swi-pullquote">
+        <p>"ORPO makes the model more consistent within a single conversation but more varied across conversations — arguably the more desirable behavior for a helpful assistant that must adapt its tone and style to diverse user needs."</p>
+      </div>
+
+      <p>
+        This finding aligns with the odds-ratio formulation's behavior: by not over-suppressing rejected responses, the model retains enough flexibility to generate varied outputs across different contexts, while the SFT component ensures that each individual response is high-quality and focused.
+      </p>
+
+      <!-- ============================================ -->
+      <!-- 10. COMPARISON WITH DPO -->
+      <!-- ============================================ -->
+      <h2 class="title">ORPO vs. DPO: A Detailed Comparison</h2>
+
+      <p>
+        For practitioners choosing between ORPO and DPO, a direct comparison is essential. See <a href="10-dpo.html">Paper 10 (DPO)</a> for the full DPO derivation and the Bradley-Terry preference model that underlies DPO's loss function.
+      </p>
+
+      <table class="swi-table">
+        <thead>
+          <tr>
+            <th>Aspect</th>
+            <th>DPO</th>
+            <th>ORPO</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Training Stages</td>
+            <td>2 (SFT + DPO)</td>
+            <td class="swi-win">1 (ORPO)</td>
+          </tr>
+          <tr>
+            <td>Reference Model</td>
+            <td>Required (frozen SFT checkpoint)</td>
+            <td class="swi-win">None</td>
+          </tr>
+          <tr>
+            <td>Forward Passes/Step</td>
+            <td>4 (policy + ref × chosen + rejected)</td>
+            <td class="swi-win">2 (chosen + rejected)</td>
+          </tr>
+          <tr>
+            <td>Memory Overhead</td>
+            <td>~2× (model + reference)</td>
+            <td class="swi-win">~1× (model only)</td>
+          </tr>
+          <tr>
+            <td>Preference Signal</td>
+            <td>Probability ratio</td>
+            <td>Odds ratio</td>
+          </tr>
+          <tr>
+            <td>Over-Suppression Risk</td>
+            <td>Higher (unbounded ratio)</td>
+            <td class="swi-win">Lower (adaptive penalty)</td>
+          </tr>
+          <tr>
+            <td>Scaling Behavior</td>
+            <td>Good but resource-heavy</td>
+            <td class="swi-win">Improves with scale</td>
+          </tr>
+          <tr>
+            <td>Tooling Maturity</td>
+            <td class="swi-win">Established (TRL, etc.)</td>
+            <td>Newer but growing</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">💡</div>
+        <div class="swi-callout-body">
+          <strong>Practitioner's Takeaway:</strong> If you have limited GPU memory or want the simplest possible training pipeline, ORPO is the clear choice. If you already have established DPO tooling and infrastructure, the performance difference may not justify migration. For new projects starting from scratch, ORPO's advantages in simplicity and memory efficiency make it the recommended default.
+        </div>
+      </div>
+
+      <!-- ============================================ -->
+      <!-- 11. MATHEMATICAL DEEP DIVE -->
+      <!-- ============================================ -->
+      <h2 class="title">Mathematical Deep Dive</h2>
+
+      <h3 class="subtitle">Why SFT Alone Is Insufficient</h3>
+
+      <p>
+        To see formally why SFT cannot learn preferences, consider what <code>L<sub>SFT</sub></code> actually optimizes. Given a dataset of chosen responses <code>D = {(x, y<sub>w</sub>)}</code>, SFT minimizes:
+      </p>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">📝</div>
+        <div class="swi-callout-body">
+          <code>L<sub>SFT</sub> = −𝔼<sub>(x,y<sub>w</sub>)∈D</sub> [log π<sub>θ</sub>(y<sub>w</sub> | x)]</code><br><br>
+          This increases <code>π<sub>θ</sub>(y<sub>w</sub> | x)</code> for chosen responses but has no mechanism to decrease <code>π<sub>θ</sub>(y<sub>l</sub> | x)</code> for rejected responses. In fact, since <code>y<sub>l</sub></code> is also valid natural language, SFT may incidentally increase its probability too.
+        </div>
+      </div>
+
+      <h3 class="subtitle">How ORPO Fixes This</h3>
+
+      <p>
+        The odds-ratio loss <code>L<sub>OR</sub></code> provides exactly the missing signal. When we add it to <code>L<sub>SFT</sub></code> with weight <code>λ</code>, the model simultaneously:
+      </p>
+
+      <ol>
+        <li><strong>Learns the demonstrations</strong> via <code>L<sub>SFT</sub></code> — increasing the probability of chosen responses</li>
+        <li><strong>Learn the preference</strong> via <code>L<sub>OR</sub></code> — increasing the odds of chosen responses <em>relative</em> to rejected ones</li>
+      </ol>
+
+      <p>
+        The SFT loss serves as the implicit reference, eliminating the need for an explicit frozen reference model. This is the key mathematical insight: the SFT component naturally bounds how much the preference loss can shift the model away from its demonstration-following behavior, because <code>L<sub>SFT</sub></code> continuously pulls the model back toward generating high-quality responses.
+      </p>
+
+      <h3 class="subtitle">Connection to Information Theory</h3>
+
+      <p>
+        The odds ratio has deep connections to information theory. The log-odds ratio is equivalent to the pointwise mutual information (PMI) between the response and the "preferred" label. This means ORPO's preference loss can be interpreted as maximizing the mutual information between the model's output distribution and the preference structure — a principled objective from an information-theoretic perspective.
+      </p>
+
+      <!-- ============================================ -->
+      <!-- 12. LIMITATIONS AND FUTURE WORK -->
+      <!-- ============================================ -->
+      <h2 class="title">Limitations and Open Questions</h2>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">🔍</div>
+        <div class="swi-callout-body">
+          <strong>Current Limitations:</strong>
+          <ul style="margin-top: 0.5rem; margin-bottom: 0;">
+            <li>The <code>λ</code> hyperparameter requires tuning per application; no universal default exists</li>
+            <li>ORPO has been primarily validated on 7B-scale models; behavior at 70B+ is less explored</li>
+            <li>The odds-ratio formulation assumes binary preference pairs; extension to ranking is non-trivial</li>
+            <li>Integration with existing tooling (TRL, Axolotl) is less mature than DPO</li>
+            <li>The interaction between ORPO and multi-turn RLHF settings is not yet well understood</li>
+          </ul>
+        </div>
+      </div>
+
+      <p>
+        Despite these limitations, ORPO represents a significant step toward simpler, more efficient alignment. The odds-ratio insight — that the choice of mathematical formulation for preference signals matters as much as the overall training architecture — is likely to influence future alignment methods beyond ORPO itself.
+      </p>
+
+      <!-- ============================================ -->
+      <!-- 13. KEY TAKEAWAYS -->
+      <!-- ============================================ -->
+      <h2 class="title">Key Takeaways</h2>
+
+      <div class="swi-steps">
+        <div class="swi-step">
+          <div class="swi-step-number">1</div>
+          <div class="swi-step-content">
+            <h4>Monolithic > Multi-Stage</h4>
+            <p>ORPO proves that SFT and preference optimization can be unified into a single objective without sacrificing performance. This eliminates pipeline complexity and reduces total training cost.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">2</div>
+          <div class="swi-step-content">
+            <h4>Odds Ratios Are the Right Tool</h4>
+            <p>The mathematical choice between odds ratios and probability ratios has real consequences for model behavior. Odds ratios provide built-in regularization against over-suppression.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">3</div>
+          <div class="swi-step-content">
+            <h4>Reference-Free = Memory-Efficient</h4>
+            <p>Eliminating the frozen reference model halves memory requirements and reduces per-step compute, making alignment feasible on more hardware configurations.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">4</div>
+          <div class="swi-step-content">
+            <h4>Scale Benefits ORPO</h4>
+            <p>ORPO's advantages compound with model size. The win rate over DPO increases at larger scales, making it particularly attractive for frontier models.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="swi-pullquote">
+        <p>"ORPO demonstrates that sometimes the path to better alignment is not through more complex pipelines, but through more elegant mathematics. By choosing the right loss formulation, you can eliminate entire stages of the training process while maintaining — or even improving — performance."</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

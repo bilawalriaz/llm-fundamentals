@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Illustrated Transformer — Deep Analysis</title>
+  <meta name="description" content="An exhaustive analysis of The Illustrated Transformer by Jay Alammar, covering self-attention mechanics, Q/K/V vectors, multi-head attention, positional encoding, encoder-decoder architecture, training, and inference.">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Noto+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --swi-ink:    #000000;
+      --swi-muted:  #666;
+      --swi-tldr-bg:#f5f5f5;
+      --swi-link:   #000;
+    }
+
+    body {
+      font-family: 'Noto Sans', sans-serif;
+      color: #000;
+      background: #ffffff;
+    }
+
+    .publication-body a {
+      color: #000;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+    }
+    .publication-body a:hover { border-bottom-color: #000; }
+    .publication-body strong { color: #000; }
+
+    .swi-gradient {
+      background: linear-gradient(90deg, #d4380d, #fa541c, #fa8c16);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-weight: bold;
+    }
+
+    .publication-title {
+      font-family: 'Google Sans', sans-serif;
+      font-size: 2.6rem;
+      line-height: 1.15;
+      letter-spacing: -0.01em;
+      font-weight: 700;
+    }
+    .publication-authors {
+      font-family: 'Google Sans', sans-serif;
+      color: #666;
+      font-size: 1.05rem;
+    }
+    .publication-authors a {
+      color: #000 !important;
+      font-weight: 600;
+    }
+    .publication-authors a:hover { text-decoration: underline; }
+    .author-block { display: inline-block; }
+    .publication-venue {
+      color: #666;
+      font-weight: bold;
+      width: fit-content;
+    }
+
+    .link-block a { margin: 6px 8px; }
+
+    .swi-tldr {
+      background-color: #f5f5f5;
+      border-radius: 10px;
+      padding: 18px 22px;
+      font-family: 'Google Sans', sans-serif;
+      font-size: 1.02rem;
+      line-height: 1.55;
+      max-width: 112%;
+      margin: 10px auto;
+    }
+
+    .swi-caption {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      max-width: 97%;
+      margin: 0.4em auto 0 auto;
+      color: #333;
+    }
+
+    .section h2.title {
+      font-family: 'Google Sans', sans-serif;
+      font-size: 1.85rem;
+      color: #000;
+      font-weight: 700;
+    }
+    .section h3.subtitle,
+    .section h3.title {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 1.25rem;
+      color: #000;
+      font-weight: 600;
+      margin-top: 1.5rem;
+    }
+
+    .publication-body {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 1.08rem;
+      line-height: 1.7;
+      color: #111;
+    }
+    .publication-body p { margin-bottom: 1.1rem; }
+    .publication-body code {
+      font-family: 'Noto Sans', sans-serif;
+      font-size: 0.92em;
+      background: #f5f5f5;
+      padding: 0.1em 0.4em;
+      border-radius: 4px;
+      color: #111;
+      font-weight: 500;
+    }
+    .publication-body pre {
+      background: #111;
+      color: #eee;
+      padding: 16px 20px;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
+    .publication-body pre code {
+      background: transparent;
+      color: inherit;
+      padding: 0;
+    }
+
+    .swi-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: 'Google Sans', sans-serif;
+      font-size: 0.95rem;
+      margin: 1.5rem 0;
+    }
+    .swi-table th, .swi-table td {
+      padding: 12px 16px;
+      text-align: left;
+    }
+    .swi-table th {
+      font-weight: 700;
+      color: #000;
+      border-bottom: 2px solid #000;
+    }
+    .swi-table td {
+      border-bottom: 1px solid #eee;
+    }
+    .swi-table tr:last-child td { border-bottom: none; }
+    .swi-table td:first-child { font-weight: 600; }
+    .swi-table-striped tbody tr:nth-child(even) { background: #fafafa; }
+
+    .swi-win { font-weight: 700; }
+
+    .swi-paginate {
+      border-top: 1px solid #e5e9ef;
+      margin-top: 3rem;
+      padding-top: 1.5rem;
+      font-family: 'Google Sans', sans-serif;
+      font-size: 0.95rem;
+    }
+    .swi-paginate a { color: #000; }
+
+    .swi-callout {
+      display: flex;
+      gap: 14px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin: 1.5rem 0;
+    }
+    .swi-callout-icon { font-size: 1.4rem; flex-shrink: 0; }
+    .swi-callout-body { font-size: 0.97rem; line-height: 1.6; }
+
+    .swi-pullquote {
+      margin: 2rem 0;
+      padding: 16px 24px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      font-style: italic;
+      font-size: 1.1rem;
+      line-height: 1.65;
+      color: #333;
+    }
+    .swi-pullquote p { margin: 0; }
+
+    .swi-steps {
+      display: flex;
+      gap: 20px;
+      margin: 1.5rem 0;
+    }
+    .swi-step {
+      flex: 1;
+      display: flex;
+      gap: 12px;
+      background: #f5f5f5;
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .swi-step-number {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #000;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+      flex-shrink: 0;
+    }
+    .swi-step-content h4 {
+      font-size: 0.95rem;
+      margin-bottom: 0.3rem;
+      color: #000;
+    }
+    .swi-step-content p {
+      font-size: 0.88rem;
+      line-height: 1.45;
+      color: #555;
+      margin: 0;
+    }
+
+    .swi-accordion {
+      border: 1px solid #e5e9ef;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      overflow: hidden;
+    }
+    .swi-accordion summary {
+      padding: 14px 18px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.97rem;
+      background: #f5f5f5;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #000;
+    }
+    .swi-accordion summary::before {
+      content: "▸";
+      transition: transform 0.2s;
+      font-size: 0.8rem;
+      color: #000;
+    }
+    .swi-accordion[open] summary::before { transform: rotate(90deg); }
+    .swi-accordion summary::-webkit-details-marker { display: none; }
+    .swi-accordion-body {
+      padding: 14px 18px;
+      font-size: 0.93rem;
+      line-height: 1.6;
+      border-top: 1px solid #e5e9ef;
+    }
+
+    .swi-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 1rem 0 2rem;
+    }
+    .swi-tag {
+      display: inline-block;
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      background: #f5f5f5;
+      color: #000;
+      border: 1px solid #ddd;
+      transition: background 0.15s;
+    }
+    .swi-tag:hover { background: #000; color: #fff; border-color: #000; }
+
+    @media (max-width: 768px) {
+      .publication-title { font-size: 1.9rem; }
+      .publication-body { font-size: 1rem; }
+      .swi-steps { flex-direction: column; }
+      .swi-step { flex-direction: column; text-align: center; }
+      .swi-step-number { margin-bottom: 0.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- HERO -->
+<section class="hero" style="padding-top: 1rem;">
+  <div class="hero-body" style="padding-bottom: 0.5rem;">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+          <h1 class="title is-1 publication-title">
+            <span class="swi-gradient">The Illustrated Transformer</span>
+          </h1>
+
+          <div class="is-size-5 publication-authors" style="margin-top: 0.6em;">
+            <span class="author-block"><a href="https://jalammar.github.io/">Jay Alammar</a></span>
+          </div>
+
+          <div class="is-size-5 publication-authors" style="margin-top: 0.4em;">
+            <span class="publication-venue">Jay Alammar Blog</span>
+          </div>
+
+          <div class="is-size-5 publication-authors" style="margin-top: 0.4em;">
+            <span class="author-block">2018 (Updated 2025)</span>
+          </div>
+
+          <div class="column has-text-centered" style="margin-top: 1.2rem;">
+            <div class="publication-links">
+              <span class="link-block">
+                <a href="https://jalammar.github.io/illustrated-transformer/"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon"><i class="fas fa-external-link-alt"></i></span>
+                  <span>Read Original</span>
+                </a>
+              </span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ABSTRACT (TL;DR) -->
+<section class="section" style="padding-bottom: 0; padding-top: 0;">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <div class="swi-tldr has-text-justified">
+          <p>
+            The Illustrated Transformer by Jay Alammar is the definitive visual walkthrough of the Transformer architecture introduced in "Attention Is All You Need" (Vaswani et al., 2017). This analysis provides an exhaustive examination of every component — from the mechanics of self-attention and the Q/K/V vector formulation, through multi-head attention and positional encoding, to the encoder-decoder architecture, residual connections, layer normalization, training with teacher forcing, and inference-time decoding strategies. Understanding this architecture is the prerequisite to every paper in this collection: it is the foundation upon which all modern LLMs are built.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- BODY -->
+<section class="section publication-body" style="padding-top: 1.5rem;">
+  <div class="container is-max-desktop">
+    <div class="content has-text-justified">
+
+      <div class="swi-tags">
+        <span class="swi-tag">Architecture</span>
+        <span class="swi-tag">Self-Attention</span>
+        <span class="swi-tag">Encoder-Decoder</span>
+        <span class="swi-tag">Multi-Head Attention</span>
+        <span class="swi-tag">Positional Encoding</span>
+        <span class="swi-tag">Seq2Seq</span>
+        <span class="swi-tag">Parallelism</span>
+      </div>
+
+      <!-- Section 1: Overview -->
+      <h2 class="title">1. Overview and Historical Context</h2>
+
+      <p>
+        Before Transformers, sequence-to-sequence tasks — machine translation, text summarization, dialogue generation — were dominated by Recurrent Neural Networks (RNNs), specifically Long Short-Term Memory (LSTM) and Gated Recurrent Unit (GRU) architectures. These models processed tokens sequentially: hidden state <code>h_t</code> depended on <code>h_{t-1}</code>, creating an inherently serial computation graph. This meant that for a sequence of length <em>n</em>, you needed <em>O(n)</em> sequential steps, making it impossible to fully parallelize across tokens. Even with techniques like bidirectional RNNs, the fundamental bottleneck remained: each position had to wait for the previous one.
+      </p>
+
+      <p>
+        The Transformer, introduced by Vaswani et al. in 2017, eliminated recurrence entirely and replaced it with <strong>self-attention</strong> — a mechanism that allows every token in a sequence to directly attend to every other token in a single computational step. This yields two transformative properties: (1) <strong>full parallelization</strong> across all positions during training, and (2) <strong>constant-depth pathways</strong> between any two tokens regardless of sequence length. The Illustrated Transformer provides the clearest visual and intuitive explanation of how this mechanism works, making it the essential reference for understanding the architecture that powers GPT, BERT, T5, LLaMA, and essentially every modern language model.
+      </p>
+
+      <div class="swi-pullquote">
+        <p>"The key innovation of the Transformer is that attention replaces recurrence — and that's what allows full parallelization across all positions in a sequence."</p>
+      </div>
+
+      <!-- Section 2: Self-Attention -->
+      <h2 class="title">2. Self-Attention: The Core Mechanism</h2>
+
+      <h3 class="title">2.1 The Intuition</h3>
+
+      <p>
+        Self-attention answers a simple question for every token: <em>"Which other tokens in this sequence are most relevant to me right now?"</em> Unlike attention in the original seq2seq models (Bahdanau et al., 2014), which attended from the decoder to the encoder, self-attention operates <strong>within</strong> a single sequence — each token attends to all tokens in the same sequence, including itself. This allows the model to capture long-range dependencies without the vanishing gradient problem that plagued RNNs.
+      </p>
+
+      <p>
+        The mechanism works by transforming each input token embedding into three vectors: a <strong>Query (Q)</strong>, a <strong>Key (K)</strong>, and a <strong>Value (V)</strong>. These are computed via learned linear projections of the input embeddings.
+      </p>
+
+      <h3 class="title">2.2 Query, Key, Value Vectors</h3>
+
+      <p>
+        For an input sequence of token embeddings <code>X ∈ ℝ^{n×d_model}</code>, where <code>n</code> is the sequence length and <code>d_model</code> is the embedding dimension (512 in the original Transformer), the Q/K/V projections are:
+      </p>
+
+<pre><code>Q = X · W_Q    where W_Q ∈ ℝ^{d_model × d_k}
+K = X · W_K    where W_K ∈ ℝ^{d_model × d_k}
+V = X · W_V    where W_V ∈ ℝ^{d_model × d_v}</code></pre>
+
+      <p>
+        The matrices <code>W_Q</code>, <code>W_K</code>, and <code>W_V</code> are <strong>learned parameters</strong> — they are not hand-crafted. Each projection is a linear transformation that maps the <code>d_model</code>-dimensional embedding into a <code>d_k</code>-dimensional (or <code>d_v</code>-dimensional) subspace. The intuition is:
+      </p>
+
+      <ul>
+        <li><strong>Query (Q):</strong> "What am I looking for?" — represents what the current token is trying to find</li>
+        <li><strong>Key (K):</strong> "What do I contain?" — represents what information this token broadcasts</li>
+        <li><strong>Value (V):</strong> "What do I actually contribute?" — the actual content that gets passed along</li>
+      </ul>
+
+      <p>
+        The analogy is a library search: the Query is your search query, the Key is the book's label/index, and the Value is the book's content. You match your query against all keys to decide how much of each value to retrieve.
+      </p>
+
+      <div class="swi-callout">
+        <span class="swi-callout-icon">📐</span>
+        <div class="swi-callout-body">
+          <strong>Dimension Choices in the Original Transformer:</strong> With <code>d_model = 512</code> and 8 attention heads, each head operates in <code>d_k = d_v = 64</code> dimensions. The total computation across all 8 heads is equivalent to a single 512-dimensional attention, but with the benefit of learning 8 independent attention patterns. This connects to <strong>Paper 04: SmolLM2</strong>, which uses grouped-query attention (GQA) to reduce KV head count for inference efficiency.
+        </div>
+      </div>
+
+      <h3 class="title">2.3 Scaled Dot-Product Attention</h3>
+
+      <p>
+        The attention score between position <code>i</code> and position <code>j</code> is computed as the dot product of the query at position <code>i</code> with the key at position <code>j</code>:
+      </p>
+
+<pre><code>Attention(Q, K, V) = softmax(QKᵀ / √d_k) · V</code></pre>
+
+      <p>
+        Step by step:
+      </p>
+
+      <div class="swi-steps">
+        <div class="swi-step">
+          <div class="swi-step-number">1</div>
+          <div class="swi-step-content">
+            <h4>Compute Scores</h4>
+            <p>Calculate <code>QKᵀ</code> — a matrix of shape <code>(n, n)</code> where entry <code>(i,j)</code> is the dot product <code>q_i · k_j</code>. This measures how "compatible" each pair of positions is.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">2</div>
+          <div class="swi-step-content">
+            <h4>Scale</h4>
+            <p>Divide by <code>√d_k</code> to prevent the dot products from growing too large in magnitude, which would push the softmax into regions with vanishing gradients.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">3</div>
+          <div class="swi-step-content">
+            <h4>Mask (Optional)</h4>
+            <p>In the decoder, apply a causal mask: set scores for positions <code>j &gt; i</code> to <code>-∞</code> so the model cannot attend to future tokens.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="swi-steps">
+        <div class="swi-step">
+          <div class="swi-step-number">4</div>
+          <div class="swi-step-content">
+            <h4>Softmax</h4>
+            <p>Apply softmax across each row to get attention weights that sum to 1. This creates a probability distribution over all positions.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">5</div>
+          <div class="swi-step-content">
+            <h4>Weighted Sum</h4>
+            <p>Multiply the attention weights by the Value matrix. Each position's output is a weighted combination of all Value vectors, with weights determined by attention scores.</p>
+          </div>
+        </div>
+      </div>
+
+      <p>
+        The scaling factor <code>√d_k</code> is critical. Without it, for large <code>d_k</code>, the dot products grow in variance, leading to extremely peaked softmax distributions that concentrate almost all probability mass on a single position. This makes gradients very small and training unstable. The variance of dot products of random vectors in <code>d_k</code> dimensions is approximately <code>d_k</code>, so dividing by <code>√d_k</code> normalizes the variance to approximately 1.
+      </p>
+
+      <h2 class="title">3. Multi-Head Attention</h2>
+
+      <h3 class="title">3.1 Why Multiple Heads?</h3>
+
+      <p>
+        A single attention head computes one attention pattern — one set of weights over all positions. But language requires attending to <em>many different types of relationships simultaneously</em>: syntactic dependencies (subject-verb agreement), coreference (pronouns referring to nouns), positional proximity, semantic similarity, and more. Multi-head attention addresses this by running multiple attention computations in parallel.
+      </p>
+
+<pre><code>MultiHead(Q, K, V) = Concat(head_1, ..., head_h) · W_O
+
+where head_i = Attention(Q·W_Q_i, K·W_K_i, V·W_V_i)</code></pre>
+
+      <p>
+        In the original Transformer, <strong>h = 8</strong> heads are used. Each head learns a <em>different</em> set of projection matrices <code>W_Q_i</code>, <code>W_K_i</code>, <code>W_V_i</code>, and consequently learns to attend to different types of relationships.
+      </p>
+
+      <h3 class="title">3.2 What Each Head Learns</h3>
+
+      <p>
+        Visualization of trained attention heads reveals specialization:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>Head Pattern</th><th>What It Attends To</th><th>Example</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Positional</td><td>Adjacent tokens, next-word</td><td>"The" → next noun</td></tr>
+          <tr><td>Syntactic</td><td>Subject-verb, modifier-noun</td><td>"The cat" → "sat"</td></tr>
+          <tr><td>Delimiter</td><td>Special tokens ([SEP], [CLS])</td><td>All tokens → [CLS]</td></tr>
+          <tr><td>Diversity</td><td>Uniform attention across all</td><td>Global context capture</td></tr>
+          <tr><td>Coreference</td><td>Pronoun → antecedent</td><td>"it" → "the dog"</td></tr>
+        </tbody>
+      </table>
+
+      <p>
+        Research by Clark et al. (2019) analyzing BERT attention heads found that specific heads reliably encode specific linguistic relationships. Some heads attend to the previous token (positional bias), some attend to sentence boundaries, and others attend to semantically related content. This specialization emerges <em>without explicit supervision</em> — it is learned purely from the language modeling objective.
+      </p>
+
+      <h3 class="title">3.3 The Output Projection</h3>
+
+      <p>
+        After concatenating the outputs of all 8 heads, the result is a matrix of shape <code>(n, h·d_v)</code> = <code>(n, 512)</code>. A final linear projection <code>W_O ∈ ℝ^{h·d_v × d_model}</code> maps this back to the model dimension, allowing the concatenated multi-head output to interact across heads. The total parameter count for a single multi-head attention layer is:
+      </p>
+
+<pre><code>Parameters = 4 × d_model²  (Q, K, V projections + output projection)
+           = 4 × 512² = 1,048,576 ≈ 1M parameters per attention layer</code></pre>
+
+      <div class="swi-callout">
+        <span class="swi-callout-icon">🔗</span>
+        <div class="swi-callout-body">
+          <strong>Cross-references:</strong> This connects to <strong>Paper 03: Phi-1</strong>, where attention modifications (blocksparse attention in Phi-3) demonstrate that the basic attention mechanism can be specialized for efficiency. It also connects to <strong>Paper 04: SmolLM2</strong>, which uses grouped-query attention (GQA) — a variant where multiple query heads share key-value heads, reducing inference-time memory without significant quality loss.
+        </div>
+      </div>
+
+      <h2 class="title">4. Positional Encoding</h2>
+
+      <h3 class="title">4.1 The Problem: Permutation Invariance</h3>
+
+      <p>
+        Self-attention is <strong>permutation-invariant</strong>: if you shuffle the input sequence, the attention mechanism produces a correspondingly shuffled output, but the attention patterns themselves don't change. This means the model has no inherent notion of word order. "The cat chased the dog" and "The dog chased the cat" would produce identical attention patterns if only the token order were changed — the model needs explicit position information.
+      </p>
+
+      <h3 class="title">4.2 Sinusoidal Positional Encoding</h3>
+
+      <p>
+        The original Transformer uses fixed sinusoidal positional encodings, where each position <code>pos</code> and dimension <code>i</code> gets a value:
+      </p>
+
+<pre><code>PE(pos, 2i)   = sin(pos / 10000^{2i/d_model})
+PE(pos, 2i+1) = cos(pos / 10000^{2i/d_model})</code></pre>
+
+      <p>
+        These encodings are <strong>added</strong> to the token embeddings before the first encoder layer. The key properties:
+      </p>
+
+      <ul>
+        <li><strong>Unique per position:</strong> Each position gets a distinct encoding vector</li>
+        <li><strong>Relative positions can be learned:</strong> <code>PE(pos+k)</code> can be represented as a linear function of <code>PE(pos)</code>, so the model can learn to attend to relative distances</li>
+        <li><strong>Generalizes to unseen lengths:</strong> Unlike learned position embeddings, sinusoidal encodings can extend to sequences longer than those seen during training</li>
+        <li><strong>Frequency spectrum:</strong> Lower dimensions encode fine-grained positional information (high frequency), while higher dimensions capture broader patterns (low frequency)</li>
+      </ul>
+
+      <p>
+        The intuition behind the frequency spectrum: the first dimension (<code>i=0</code>) has period 2π, alternating rapidly between +1 and -1 for adjacent positions. The last dimension has period <code>2π × 10000</code>, barely changing over thousands of positions. Together, they create a rich, multi-scale representation of absolute position — analogous to a binary counter where each bit flips at a different rate.
+      </p>
+
+      <h3 class="title">4.3 Learned Positional Embeddings</h3>
+
+      <p>
+        An alternative (used by BERT and GPT-2) is to learn position embeddings directly as parameters: a matrix <code>E_pos ∈ ℝ^{L_max × d_model}</code> where <code>L_max</code> is the maximum sequence length. These are learned during training and added to the token embeddings. The tradeoff:
+      </p>
+
+      <table class="swi-table">
+        <thead>
+          <tr><th>Approach</th><th>Advantage</th><th>Disadvantage</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Sinusoidal</td><td>Generalizes to unseen lengths</td><td>May be less expressive</td></tr>
+          <tr><td>Learned</td><td>Can capture complex patterns</td><td>Fixed max length, more parameters</td></tr>
+          <tr><td>Rotary (RoPE)</td><td>Relative by construction, extends well</td><td>Slightly more complex implementation</td></tr>
+        </tbody>
+      </table>
+
+      <p>
+        Modern LLMs (LLaMA, Qwen, Mistral) have largely moved to <strong>Rotary Position Embeddings (RoPE)</strong>, which encode relative position directly in the attention computation rather than adding position information to the input. This allows much longer context windows (128K+ tokens) without retraining.
+      </p>
+
+      <h2 class="title">5. Residual Connections and Layer Normalization</h2>
+
+      <h3 class="title">5.1 Residual Connections</h3>
+
+      <p>
+        Each sub-layer in the Transformer (attention or feed-forward) is wrapped with a residual connection:
+      </p>
+
+<pre><code>output = LayerNorm(x + Sublayer(x))</code></pre>
+
+      <p>
+        The residual connection adds the original input <code>x</code> directly to the sub-layer's output. This serves two critical purposes:
+      </p>
+
+      <ul>
+        <li><strong>Gradient flow:</strong> During backpropagation, gradients can flow directly through the identity skip connection, bypassing the sub-layer entirely. This prevents vanishing gradients in deep networks.</li>
+        <li><strong>Feature preservation:</strong> The model can learn to make small modifications to the input representation rather than completely rewriting it, which is easier to optimize.</li>
+      </ul>
+
+      <h3 class="title">5.2 Layer Normalization</h3>
+
+      <p>
+        Layer normalization normalizes the activations across the feature dimension for each token independently:
+      </p>
+
+<pre><code>LayerNorm(x) = γ · (x - μ) / √(σ² + ε) + β</code></pre>
+
+      <p>
+        where <code>μ</code> and <code>σ²</code> are the mean and variance computed across the feature dimension, and <code>γ</code>, <code>β</code> are learned scale and shift parameters. Layer normalization stabilizes training by ensuring activations have consistent statistical properties across layers. The original Transformer uses <strong>Post-LN</strong> (normalize after the residual addition), while modern models typically use <strong>Pre-LN</strong> (normalize before the sub-layer), which allows training deeper models more easily.
+      </p>
+
+      <div class="swi-callout">
+        <span class="swi-callout-icon">⚠️</span>
+        <div class="swi-callout-body">
+          <strong>RMSNorm vs LayerNorm:</strong> Modern LLMs (LLaMA, SmolLM2) have largely replaced LayerNorm with RMSNorm, which omits the mean-centering step and only normalizes by the root mean square. This is computationally cheaper and has been shown to work equally well in practice. See <strong>Paper 04: SmolLM2</strong> for its use in a small-model context.
+        </div>
+      </div>
+
+      <h2 class="title">6. The Feed-Forward Network</h2>
+
+      <p>
+        After each attention sub-layer, a position-wise feed-forward network (FFN) is applied independently to each position:
+      </p>
+
+<pre><code>FFN(x) = ReLU(x · W_1 + b_1) · W_2 + b_2</code></pre>
+
+      <p>
+        The FFN expands from <code>d_model</code> to <code>d_ff = 2048</code> (4× the model dimension in the original), applies a nonlinearity, then projects back down. This is essentially a two-layer MLP applied independently at each position. The expansion ratio (typically 4×) provides capacity for non-linear feature transformation.
+      </p>
+
+      <p>
+        The FFN is often described as the "memory" of the Transformer: while attention performs information routing (deciding which tokens to mix), the FFN stores and retrieves factual knowledge. Research by Meng et al. (2022) on knowledge editing found that factual associations are primarily stored in the FFN layers, suggesting a division of labor: <strong>attention = communication, FFN = storage</strong>.
+      </p>
+
+      <h2 class="title">7. Encoder-Decoder Architecture</h2>
+
+      <h3 class="title">7.1 The Encoder Stack</h3>
+
+      <p>
+        The encoder consists of 6 identical layers, each containing:
+      </p>
+
+      <ol>
+        <li><strong>Multi-head self-attention</strong> — every token attends to every other token (no mask)</li>
+        <li><strong>Position-wise FFN</strong> — independent transformation at each position</li>
+        <li>Residual connections + layer normalization around each sub-layer</li>
+      </ol>
+
+      <p>
+        The encoder processes the entire input sequence in parallel, producing contextual representations where each token's embedding has been enriched by information from all other tokens. After 6 layers, the encoder output is a matrix <code>ℝ^{n×d_model}</code> that serves as the memory for the decoder.
+      </p>
+
+      <h3 class="title">7.2 The Decoder Stack</h3>
+
+      <p>
+        The decoder also has 6 identical layers, but each layer has <strong>three</strong> sub-layers instead of two:
+      </p>
+
+      <ol>
+        <li><strong>Masked multi-head self-attention:</strong> Identical to encoder self-attention, but with a causal mask that prevents position <code>i</code> from attending to positions <code>j &gt; i</code>. This is essential for autoregressive generation — during training, each position should only see the tokens that came before it.</li>
+        <li><strong>Multi-head cross-attention:</strong> The Queries come from the decoder, but the Keys and Values come from the encoder output. This allows each decoder position to attend to all encoder positions, retrieving relevant information from the input.</li>
+        <li><strong>Position-wise FFN:</strong> Same as in the encoder.</li>
+      </ol>
+
+      <p>
+        The cross-attention mechanism is the bridge between input and output. For machine translation, it allows each word being generated to "look back" at all source words and decide which ones are relevant. The Keys and Values are computed from the encoder output (shared across all decoder layers), while the Queries are computed from the decoder's current state.
+      </p>
+
+      <h3 class="title">7.3 Decoder-Only Models</h3>
+
+      <p>
+        It's worth noting that most modern LLMs (GPT, LLaMA, Mistral, Qwen) use a <strong>decoder-only</strong> architecture — they drop the encoder and cross-attention entirely, using only masked self-attention and FFN layers. This simplification works because language modeling is inherently autoregressive: you predict the next token given all previous tokens, which only requires the causal (masked) self-attention that the decoder already has. The encoder-decoder structure is still preferred for tasks like translation where there are two distinct sequences (source and target).
+      </p>
+
+      <div class="swi-pullquote">
+        <p>"The decoder-only architecture became dominant because language modeling is fundamentally autoregressive — you only need to predict the next token given previous tokens, which masked self-attention handles perfectly."</p>
+      </div>
+
+      <h2 class="title">8. Training: Teacher Forcing and Loss</h2>
+
+      <h3 class="title">8.1 Teacher Forcing</h3>
+
+      <p>
+        During training, the Transformer uses <strong>teacher forcing</strong>: the decoder receives the ground-truth target sequence (shifted right by one position) as input, rather than its own predictions. For the target sequence <code>y_1, y_2, ..., y_m</code>, the decoder input is <code>&lt;bos&gt;, y_1, y_2, ..., y_{m-1}</code> and the model is trained to predict <code>y_1, y_2, ..., y_m</code> at each position.
+      </p>
+
+      <p>
+        The training loss is the standard cross-entropy loss applied to the next-token prediction at each position:
+      </p>
+
+<pre><code>L = -Σ_{t=1}^{m} log P(y_t | y_{&lt;t}, X)</code></pre>
+
+      <p>
+        This formulation means all positions are predicted <em>simultaneously</em> — the entire target sequence is processed in one forward pass, and the loss is the average negative log-likelihood across all positions. This is a massive computational advantage over RNNs, which required sequential processing.
+      </p>
+
+      <h3 class="title">8.2 Training Details</h3>
+
+      <p>
+        The original Transformer was trained on the WMT 2014 English-German translation task (4.5M sentence pairs) and WMT 2014 English-French task (36M sentence pairs). Key hyperparameters:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>Parameter</th><th>Value</th><th>Purpose</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>d_model</td><td>512</td><td>Model/embedding dimension</td></tr>
+          <tr><td>d_ff</td><td>2048</td><td>FFN hidden dimension</td></tr>
+          <tr><td>h (heads)</td><td>8</td><td>Number of attention heads</td></tr>
+          <tr><td>d_k = d_v</td><td>64</td><td>Per-head dimension</td></tr>
+          <tr><td>Encoder layers</td><td>6</td><td>Depth of encoder stack</td></tr>
+          <tr><td>Decoder layers</td><td>6</td><td>Depth of decoder stack</td></tr>
+          <tr><td>Learning rate</td><td>Variable (warmup)</td><td>See schedule below</td></tr>
+          <tr><td>Dropout</td><td>0.1</td><td>Regularization</td></tr>
+          <tr><td>Batch size</td><td>~25K tokens</td><td>Dynamic batching</td></tr>
+          <tr><td>Warmup steps</td><td>4,000</td><td>Linear warmup</td></tr>
+        </tbody>
+      </table>
+
+      <h3 class="title">8.3 Learning Rate Schedule</h3>
+
+      <p>
+        The Transformer uses a distinctive learning rate schedule with linear warmup followed by inverse square root decay:
+      </p>
+
+<pre><code>lr = d_model^{-0.5} × min(step^{-0.5}, step × warmup_steps^{-1.5})</code></pre>
+
+      <p>
+        The learning rate increases linearly from 0 to its maximum during the first 4,000 steps (warmup), then decreases proportionally to the inverse square root of the step number. This schedule was found to be crucial for stability — starting with a high learning rate causes divergence, while no warmup leads to slow convergence. This warmup + decay pattern has become standard in transformer training.
+      </p>
+
+      <h2 class="title">9. Inference: Decoding Strategies</h2>
+
+      <h3 class="title">9.1 Autoregressive Generation</h3>
+
+      <p>
+        At inference time, the model generates text token by token. For each new token:
+      </p>
+
+      <div class="swi-steps">
+        <div class="swi-step">
+          <div class="swi-step-number">1</div>
+          <div class="swi-step-content">
+            <h4>Feed Input</h4>
+            <p>Pass the prefix (all previously generated tokens) through the encoder (for encoder-decoder) or directly through the decoder (decoder-only).</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">2</div>
+          <div class="swi-step-content">
+            <h4>Compute Dist</h4>
+            <p>The final layer produces logits for each token in the vocabulary. Apply softmax to get a probability distribution.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">3</div>
+          <div class="swi-step-content">
+            <h4>Sample/Select</h4>
+            <p>Choose the next token using greedy decoding (argmax), beam search, or sampling (top-k, top-p/nucleus).</p>
+          </div>
+        </div>
+      </div>
+
+      <h3 class="title">9.2 Greedy Decoding vs. Beam Search</h3>
+
+      <p>
+        <strong>Greedy decoding</strong> selects the highest-probability token at each step. It's fast but globally suboptimal — the locally best choice may lead to a worse overall sequence.
+      </p>
+
+      <p>
+        <strong>Beam search</strong> maintains <code>k</code> hypotheses (beams) simultaneously, expanding each by all possible next tokens and keeping only the top <code>k</code> most probable complete sequences. For translation, beam search with <code>k=4</code> or <code>k=8</code> typically improves over greedy decoding. However, for open-ended generation (stories, dialogue), beam search can produce degenerate, repetitive text — sampling methods (temperature scaling, top-k, nucleus sampling) are preferred.
+      </p>
+
+      <h3 class="title">9.3 Parallelization Advantage</h3>
+
+      <p>
+        The key computational advantage over RNNs: during training, all positions are computed in parallel. For an RNN processing a sequence of length <code>n</code>, you need <code>O(n)</code> sequential steps. For a Transformer, the self-attention computation is <code>O(n²)</code> in total FLOPs, but each operation is independent and can be executed in parallel on GPU/TPU hardware. In practice, for sequences up to a few thousand tokens, Transformers are dramatically faster to train than RNNs because of this parallelism.
+      </p>
+
+      <p>
+        The quadratic attention cost <code>O(n²)</code> becomes a limitation for very long sequences (100K+ tokens). This has motivated research into efficient attention mechanisms: sparse attention (Longformer, BigBird), linear attention (Linformer, Performer), and FlashAttention (Dao et al., 2022), which doesn't reduce FLOPs but dramatically improves memory efficiency by computing attention in blocks that fit in GPU SRAM. This connects to <strong>Paper 03: Phi-1</strong>, which uses FlashAttention for efficient training, and <strong>Paper 04: SmolLM2</strong>, which also leverages FlashAttention for small-model efficiency.
+      </p>
+
+      <h2 class="title">10. Ablations and Design Decisions</h2>
+
+      <details class="swi-accordion">
+        <summary>Why not use a single large attention head instead of multiple small ones?</summary>
+        <div class="swi-accordion-body">
+          Ablations in the original paper show that reducing the number of heads while keeping the total dimension constant degrades performance. Multiple heads allow the model to attend to different types of relationships simultaneously. With a single head of dimension <code>d_k = 512</code>, the model would compute one attention pattern per position — it would have to compromise between attending to syntactic structure, semantic similarity, and positional proximity. With 8 heads of dimension 64 each, these patterns can be learned independently and combined. The computational cost is identical (same total matrix multiplications), but the representational capacity is greater.
+        </div>
+      </details>
+
+      <details class="swi-accordion">
+        <summary>Why is the scaling factor √d_k and not something else?</summary>
+        <div class="swi-accordion-body">
+          The scaling factor corrects for the variance growth of dot products. For random vectors <code>q, k ∈ ℝ^{d_k}</code> with entries drawn from a distribution with mean 0 and variance 1, the expected value of <code>q·k</code> is 0 but the variance is <code>d_k</code>. Without scaling, for large <code>d_k</code>, the dot products have large magnitude, pushing the softmax into regions where gradients are extremely small (the "softmax saturation" problem). Dividing by <code>√d_k</code> normalizes the variance back to approximately 1, keeping softmax in a well-behaved regime. This is analogous to Xavier initialization for neural networks.
+        </div>
+      </details>
+
+      <details class="swi-accordion">
+        <summary>Why 6 layers in both encoder and decoder?</summary>
+        <div class="swi-accordion-body">
+          The original paper ablated depth: 1, 2, 4, 6, and 8 layers. Performance improved significantly from 1→2→4 layers, with diminishing returns beyond 6. Deeper models also required more training data and compute to avoid overfitting. The 6-layer choice was a practical balance between performance and training cost on the available hardware (8 NVIDIA P100 GPUs). Modern LLMs use much deeper models (32-128 layers) because they train on vastly more data, but the principle of diminishing returns with depth still holds.
+        </div>
+      </details>
+
+      <details class="swi-accordion">
+        <summary>Why Pre-LN vs Post-LN?</summary>
+        <div class="swi-accordion-body">
+          The original Transformer uses Post-LN: <code>LayerNorm(x + Sublayer(x))</code>. However, this makes training very sensitive to initialization and learning rate — deep Post-LN models often diverge. Xiong et al. (2020) showed that Pre-LN (<code>x + Sublayer(LayerNorm(x))</code>) provides much more stable training because the gradient norm is preserved through the residual path without being disrupted by layer normalization. Pre-LN is now standard in virtually all LLMs. The tradeoff is that Post-LN models may achieve slightly better final performance when they do converge, but the stability advantage of Pre-LN makes it practically superior.
+        </div>
+      </details>
+
+      <h2 class="title">11. Limitations</h2>
+
+      <p>
+        The Illustrated Transformer, while exhaustive as a visual guide, has several limitations worth noting:
+      </p>
+
+      <ul>
+        <li><strong>Focus on original architecture:</strong> It describes the 2017 Transformer, not the many variants that have since emerged (decoder-only, encoder-only, sparse attention, GQA, RoPE, etc.).</li>
+        <li><strong>No coverage of modern modifications:</strong> Topics like FlashAttention, grouped-query attention, rotary embeddings, sliding window attention, and mixture-of-experts are not covered.</li>
+        <li><strong>Translation-centric:</strong> The examples focus on machine translation, while the vast majority of modern Transformer usage is language modeling, code generation, and multimodal tasks.</li>
+        <li><strong>Compute analysis:</strong> The blog doesn't deeply analyze the computational complexity tradeoffs between attention (O(n²)) and recurrence (O(n)), which are crucial for understanding scalability limits.</li>
+        <li><strong>No training recipes:</strong> Modern training involves data mixtures, curriculum learning, and scaling laws that go far beyond the original paper's simple setup.</li>
+      </ul>
+
+      <h2 class="title">12. Practical Implications</h2>
+
+      <p>
+        Understanding the Transformer architecture has direct practical implications for every other paper in this collection:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>Architecture Component</th><th>Practical Impact</th><th>Paper Connection</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Self-attention (Q/K/V)</td><td>LoRA targets attention projections</td><td>Papers 03, 04</td></tr>
+          <tr><td>Multi-head attention</td><td>GQA reduces KV cache for inference</td><td>Paper 04 (SmolLM2)</td></tr>
+          <tr><td>Feed-forward network</td><td>Stores factual knowledge, target for editing</td><td>All papers</td></tr>
+          <tr><td>Decoder-only architecture</td><td>Standard for autoregressive generation</td><td>Papers 03, 04, 09</td></tr>
+          <tr><td>Positional encoding</td><td>Context length extension (RoPE scaling)</td><td>Paper 04 (2K→8K)</td></tr>
+          <tr><td>Residual connections + LN</td><td>Enables training 100+ layer models</td><td>All papers</td></tr>
+          <tr><td>Cross-attention</td><td>Encoder-decoder for translation, T5-style tasks</td><td>Paper 05 (Flan-T5)</td></tr>
+        </tbody>
+      </table>
+
+      <div class="swi-callout">
+        <span class="swi-callout-icon">🎯</span>
+        <div class="swi-callout-body">
+          <strong>Key Takeaway:</strong> The Transformer is not just an architecture — it is the <em>lingua franca</em> of modern AI. Every paper in this collection modifies, scales, or trains Transformers. Understanding the Q/K/V attention mechanism, the role of positional encoding, and the encoder-decoder vs. decoder-only distinction is essential for comprehending the innovations in data curation (Papers 03, 04), instruction tuning (Papers 05, 09), and emergent capabilities (Paper 02) that build on this foundation.
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phi-3 Technical Report: A Highly Capable Language Model Locally on Your Phone</title>
+  <meta name="description" content="Exhaustive analysis of Microsoft's Phi-3 family (3.8B–14B), including LongRope, blocksparse attention, MoE architecture, data-optimal training, and mobile deployment strategies.">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Noto+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    :root { --swi-ink:#000000; --swi-muted:#666; --swi-tldr-bg:#f5f5f5; --swi-link:#000; }
+    body { font-family:'Noto Sans',sans-serif; color:#000; background:#fff; }
+    .publication-body a { color:#000; border-bottom:1px solid rgba(0,0,0,.2); }
+    .publication-body a:hover { border-bottom-color:#000; }
+    .publication-body strong { color:#000; }
+    .swi-gradient { background:linear-gradient(90deg,#d4380d,#fa541c,#fa8c16); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-weight:700; }
+    .publication-title { font-family:'Google Sans',sans-serif; font-size:2.6rem; line-height:1.15; letter-spacing:-.01em; font-weight:700; }
+    .publication-authors { font-family:'Google Sans',sans-serif; color:#666; font-size:1.05rem; }
+    .publication-authors a { color:#000!important; font-weight:600; }
+    .publication-authors a:hover { text-decoration:underline; }
+    .author-block { display:inline-block; }
+    .publication-venue { color:#666; font-weight:700; width:fit-content; }
+    .link-block a { margin:6px 8px; }
+    .swi-tldr { background-color:#f5f5f5; border-radius:10px; padding:18px 22px; font-family:'Google Sans',sans-serif; font-size:1.02rem; line-height:1.55; max-width:112%; margin:10px auto; }
+    .section h2.title { font-family:'Google Sans',sans-serif; font-size:1.85rem; color:#000; font-weight:700; }
+    .section h3.subtitle,.section h3.title { font-family:'Noto Sans',sans-serif; font-size:1.25rem; color:#000; font-weight:600; margin-top:1.5rem; }
+    .publication-body { font-family:'Noto Sans',sans-serif; font-size:1.08rem; line-height:1.7; color:#111; }
+    .publication-body p { margin-bottom:1.1rem; }
+    .publication-body code { font-family:'Noto Sans',sans-serif; font-size:.92em; background:#f5f5f5; padding:.1em .4em; border-radius:4px; color:#111; font-weight:500; }
+    .publication-body pre { background:#111; color:#eee; padding:16px 20px; border-radius:8px; font-size:.88rem; line-height:1.5; overflow-x:auto; margin:1rem 0; }
+    .publication-body pre code { background:transparent; color:inherit; padding:0; }
+    .swi-table { width:100%; border-collapse:collapse; font-family:'Google Sans',sans-serif; font-size:.95rem; margin:1.5rem 0; }
+    .swi-table th,.swi-table td { padding:12px 16px; text-align:left; }
+    .swi-table th { font-weight:700; color:#000; border-bottom:2px solid #000; }
+    .swi-table td { border-bottom:1px solid #eee; }
+    .swi-table tr:last-child td { border-bottom:none; }
+    .swi-table td:first-child { font-weight:600; }
+    .swi-table-striped tbody tr:nth-child(even) { background:#fafafa; }
+    .swi-win { font-weight:700; }
+    .swi-callout { display:flex; gap:14px; background:#f5f5f5; border-radius:8px; padding:16px 20px; margin:1.5rem 0; }
+    .swi-callout-icon { font-size:1.4rem; flex-shrink:0; }
+    .swi-callout-body { font-size:.97rem; line-height:1.6; }
+    .swi-pullquote { margin:2rem 0; padding:16px 24px; background:#f5f5f5; border-radius:8px; font-style:italic; font-size:1.1rem; line-height:1.65; color:#333; }
+    .swi-pullquote p { margin:0; }
+    .swi-steps { display:flex; gap:20px; margin:1.5rem 0; }
+    .swi-step { flex:1; display:flex; gap:12px; background:#f5f5f5; border-radius:10px; padding:16px; }
+    .swi-step-number { width:32px; height:32px; border-radius:50%; background:#000; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.9rem; flex-shrink:0; }
+    .swi-step-content h4 { font-size:.95rem; margin-bottom:.3rem; color:#000; }
+    .swi-step-content p { font-size:.88rem; line-height:1.45; color:#555; margin:0; }
+    .swi-accordion { border:1px solid #e5e9ef; border-radius:8px; margin-bottom:8px; overflow:hidden; }
+    .swi-accordion summary { padding:14px 18px; cursor:pointer; font-weight:600; font-size:.97rem; background:#f5f5f5; list-style:none; display:flex; align-items:center; gap:8px; color:#000; }
+    .swi-accordion summary::before { content:"▸"; transition:transform .2s; font-size:.8rem; color:#000; }
+    .swi-accordion[open] summary::before { transform:rotate(90deg); }
+    .swi-accordion summary::-webkit-details-marker { display:none; }
+    .swi-accordion-body { padding:14px 18px; font-size:.93rem; line-height:1.6; border-top:1px solid #e5e9ef; }
+    .swi-tags { display:flex; flex-wrap:wrap; gap:8px; margin:1rem 0 2rem; }
+    .swi-tag { display:inline-block; padding:5px 14px; border-radius:20px; font-size:.82rem; font-weight:500; background:#f5f5f5; color:#000; border:1px solid #ddd; transition:background .15s; }
+    .swi-tag:hover { background:#000; color:#fff; border-color:#000; }
+    @media(max-width:768px){.publication-title{font-size:1.9rem;}.publication-body{font-size:1rem;}.swi-steps{flex-direction:column;}.swi-step{flex-direction:column;text-align:center;}.swi-step-number{margin-bottom:.5rem;}}
+  </style>
+</head>
+<body>
+
+<!-- HERO -->
+<section class="hero" style="padding-top:1rem;">
+  <div class="hero-body" style="padding-bottom:.5rem;">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+          <h1 class="title is-1 publication-title">
+            <span class="swi-gradient">Phi-3 Technical Report: A Highly Capable Language Model Locally on Your Phone</span>
+          </h1>
+          <div class="is-size-5 publication-authors" style="margin-top:.6em;">
+            <span class="author-block"><a href="https://arxiv.org/abs/2404.14219">Microsoft Research</a></span>
+          </div>
+          <div class="is-size-5 publication-authors" style="margin-top:.4em;">
+            <span class="publication-venue">arXiv:2404.14219</span>
+          </div>
+          <div class="is-size-5 publication-authors" style="margin-top:.4em;">
+            <span class="author-block">April 2024</span>
+          </div>
+          <div class="column has-text-centered" style="margin-top:1.2rem;">
+            <div class="publication-links">
+              <span class="link-block">
+                <a href="https://arxiv.org/abs/2404.14219" class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon"><i class="fas fa-file-pdf"></i></span>
+                  <span>arXiv</span>
+                </a>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TL;DR -->
+<section class="section" style="padding-bottom:0;padding-top:0;">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <div class="swi-tldr has-text-justified">
+          <p>
+            Phi-3 is Microsoft's family of small language models—spanning Phi-3-mini (3.8B), Phi-3-small (7B), and Phi-3-medium (14B)—that demonstrates models trained on carefully curated, textbook-quality data can rival models 10× larger on standard benchmarks. The 3.8B model runs on an iPhone with &gt;30 tokens/second and outperforms Mixtral-8x7B and GPT-3.5 on many tasks. Key technical innovations include <strong>LongRope</strong> (extending RoPE to 128K context without full retraining), <strong>blocksparse attention</strong> (Triton-kernel-based efficient attention), and an MoE variant (16 experts, top-2 routing, ~3.3B active parameters). The report also introduces Phi-3.5-mini, Phi-3.5-MoE, and Phi-3.5-Vision, extending the family with multilingual, MoE, and multimodal capabilities. This paper proves that the data-optimal regime—where quality beats scale—is practical and deployable at the edge.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- BODY -->
+<section class="section publication-body" style="padding-top:1.5rem;">
+  <div class="container is-max-desktop">
+    <div class="content has-text-justified">
+
+      <div class="swi-tags">
+        <span class="swi-tag">Small Language Models</span>
+        <span class="swi-tag">Data-Optimal Training</span>
+        <span class="swi-tag">LongRope</span>
+        <span class="swi-tag">Blocksparse Attention</span>
+        <span class="swi-tag">MoE Architecture</span>
+        <span class="swi-tag">Mobile Deployment</span>
+        <span class="swi-tag">128K Context</span>
+        <span class="swi-tag">Quantization</span>
+        <span class="swi-tag">SFT + DPO</span>
+      </div>
+
+      <!-- Section 1: Overview -->
+      <h2 class="title">1. Research Overview and Context</h2>
+
+      <p>
+        Phi-3 represents a paradigm shift in how we think about model size versus capability. Following the thesis established by Phi-1 (<a href="03-phi-1-textbooks.html">Paper 03</a>) and Phi-2, this paper argues that <strong>data quality is the primary driver of LLM performance</strong>, not parameter count. The core claim is remarkable: a 3.8B parameter model trained on carefully curated data can match or exceed the performance of models with 10× more parameters, including Mixtral-8x7B (46.7B total, 12.9B active) and GPT-3.5-turbo.
+      </p>
+
+      <p>
+        The paper is not merely a scaling argument—it introduces genuine architectural innovations (LongRope, blocksparse attention, MoE with SparseMixer) that make practical deployment possible. The combination of a data-optimal training pipeline with deployment-focused engineering makes Phi-3 one of the most practically impactful model families for edge computing, mobile AI, and resource-constrained environments.
+      </p>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">🎯</div>
+        <div class="swi-callout-body">
+          <strong>Key Contributions:</strong> (1) Phi-3-mini (3.8B) matching models 10× larger. (2) LongRope extending context to 128K without full retraining. (3) Blocksparse attention with custom Triton kernels for efficient long-context inference. (4) MoE variant (16 experts, top-2, ~3.3B active) achieving dense-model quality at sparse-model cost. (5) Practical mobile deployment: INT4 quantized model runs on iPhone at &gt;30 tok/s.
+        </div>
+      </div>
+
+      <!-- Section 2: Model Family -->
+      <h2 class="title">2. The Phi-3 Model Family</h2>
+
+      <p>
+        The Phi-3 family consists of three dense models and subsequent MoE/multimodal variants. Each model is designed for a specific deployment tier:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th>Parameters</th>
+            <th>Context</th>
+            <th>Vocab</th>
+            <th>Deployment Target</th>
+            <th>Key Feature</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Phi-3-mini</td>
+            <td class="swi-win">3.8B</td>
+            <td>128K (LongRope)</td>
+            <td>32K (Llama-2)</td>
+            <td>Mobile / Edge</td>
+            <td>iPhone &gt;30 tok/s INT4</td>
+          </tr>
+          <tr>
+            <td>Phi-3-small</td>
+            <td>7B</td>
+            <td>128K (LongRope)</td>
+            <td>100K (tiktoken)</td>
+            <td>Single GPU</td>
+            <td>8 heads, GQA, 2 KV heads</td>
+          </tr>
+          <tr>
+            <td>Phi-3-medium</td>
+            <td>14B</td>
+            <td>128K (LongRope)</td>
+            <td>100K (tiktoken)</td>
+            <td>Single GPU / Multi-GPU</td>
+            <td>Competes with Llama-3-8B-Instruct</td>
+          </tr>
+          <tr>
+            <td>Phi-3-mini-4k</td>
+            <td>3.8B</td>
+            <td>4K</td>
+            <td>32K (Llama-2)</td>
+            <td>Mobile / Edge</td>
+            <td>Smaller context, faster inference</td>
+          </tr>
+          <tr>
+            <td>Phi-3-MoE (3.5)</td>
+            <td>14B total / 3.3B active</td>
+            <td>128K</td>
+            <td>32K</td>
+            <td>Single GPU</td>
+            <td>16 experts, top-2, SparseMixer</td>
+          </tr>
+          <tr>
+            <td>Phi-3.5-mini</td>
+            <td>3.8B</td>
+            <td>128K</td>
+            <td>32K</td>
+            <td>Mobile</td>
+            <td>Multilingual, improved safety</td>
+          </tr>
+          <tr>
+            <td>Phi-3.5-Vision</td>
+            <td>4.2B</td>
+            <td>128K</td>
+            <td>32K</td>
+            <td>Mobile / Edge</td>
+            <td>Multimodal: image + text</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">📊</div>
+        <div class="swi-callout-body">
+          <strong>Tokenizer Divergence:</strong> Phi-3-mini uses the Llama-2 tokenizer with a 32K vocabulary, while Phi-3-small and Phi-3-medium use a tiktoken-based tokenizer with a 100K vocabulary. This is an important implementation detail: the 100K tokenizer provides better compression for multilingual and code content, but the 32K tokenizer is more compatible with existing tooling. The Phi-3.5 variants return to the 32K vocabulary for maximum deployment flexibility.
+        </div>
+      </div>
+
+      <!-- Section 3: Data-Optimal Regime -->
+      <h2 class="title">3. The Data-Optimal Training Regime</h2>
+
+      <p>
+        Phi-3's core thesis is the <strong>data-optimal regime</strong>: for a fixed compute budget, there exists an optimal model size, and training a smaller model on higher-quality data yields better results than training a larger model on noisier data. This is the continuation of the Phi-1/Phi-2 philosophy, but now validated at scale with rigorous benchmark comparisons.
+      </p>
+
+      <h3 class="subtitle">3.1 Data Composition</h3>
+
+      <p>
+        The pretraining data is carefully curated across multiple sources. Unlike models that simply maximize token count, Phi-3 uses a progressive data quality pipeline where the proportion of high-quality data increases through training stages:
+      </p>
+
+      <pre><code>Phi-3 Data Composition (Pretraining):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Stage 1: Large-scale web data (filtered)
+  - Heavy deduplication (semantic + exact)
+  - Quality filtering via perplexity thresholds
+  - Educational content prioritized
+
+Stage 2: Synthetically enhanced data
+  - Textbook-quality synthetic data (Phi-1 approach)
+  - Code-centric reasoning chains
+  - Math problem-solution pairs
+
+Stage 3: High-quality curated data
+  - Selected web pages (Wikipedia, textbooks, research)
+  - Teacher-model generated data (GPT-4 distilled)
+  - Domain-specific curated corpora
+
+Total: ~4.9T tokens (3.3T from web, 1.6T synthetic/curated)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</code></pre>
+
+      <h3 class="subtitle">3.2 Quality Over Quantity</h3>
+
+      <p>
+        The key finding is that Phi-3-mini (3.8B) trained on high-quality curated data outperforms models trained on 10× more tokens of standard web data. This has profound implications for training efficiency: rather than scaling up compute, invest in data curation. The paper demonstrates this empirically by comparing Phi-3's benchmark performance against models like Llama-3-8B, Mistral-7B, and Mixtral-8x7B.
+      </p>
+
+      <div class="swi-pullquote">
+        <p>"The data-optimal regime proves that a 3.8B model with curated data can match a 30B+ model with standard data. This shifts the optimization target from 'more compute' to 'better data.'"</p>
+      </div>
+
+      <!-- Section 4: LongRope -->
+      <h2 class="title">4. LongRope: Extending RoPE to 128K Context</h2>
+
+      <p>
+        LongRope is one of Phi-3's most significant technical contributions. Standard RoPE (Rotary Position Embeddings) suffers from performance degradation when extended far beyond its training context length. LongRope addresses this by introducing a <strong>dynamic, per-head scaling factor</strong> that adjusts the frequency of position embeddings, enabling extension to 128K tokens without retraining from scratch.
+      </p>
+
+      <h3 class="subtitle">4.1 How LongRope Works</h3>
+
+      <p>
+        Standard RoPE encodes position information through sinusoidal functions with fixed frequency scales. For a model trained with context length L, extending to L' &gt; L causes the attention mechanism to "see" positions beyond its training distribution, leading to degraded attention weights. LongRope solves this by:
+      </p>
+
+      <pre><code>LongRope Algorithm:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Standard RoPE:
+  θ_i = 1 / (base^(2i/d))     for i = 0, 1, ..., d/2-1
+  
+  Position encoding: q_k = (q_k · cos(θ_k · pos) + q_k · sin(θ_k · pos))
+
+LongRope Modification:
+  θ_i = s_i / (base^(2i/d))    for i = 0, 1, ..., d/2-1
+
+  where s_i is a PER-HEAD, PER-FREQUENCY scaling factor
+  
+  s_i = α_i · (L'/L)           adaptive scaling per frequency band
+  
+  Two-stage approach:
+    1. Short-context fine-tuning (4K) to fit scaling factors
+    2. Long-context fine-tuning (128K) to adapt attention patterns
+
+Key insight: Different frequency bands need different scaling factors.
+  Low frequencies (capturing local patterns) need less scaling.
+  High frequencies (capturing long-range patterns) need more scaling.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</code></pre>
+
+      <h3 class="subtitle">4.2 Why Per-Head Scaling Matters</h3>
+
+      <p>
+        Standard approaches to extending RoPE use a uniform scaling factor across all attention heads and frequency bands. LongRope's per-head, per-frequency scaling recognizes that different attention heads specialize in capturing different types of relationships: some heads focus on local syntax (short-range), while others capture long-range dependencies. By scaling each head's frequencies independently, LongRope preserves the local attention patterns while extending the long-range coverage.
+      </p>
+
+      <h3 class="subtitle">4.3 Training Procedure</h3>
+
+      <p>
+        LongRope extension requires only a short fine-tuning phase, not full retraining from the original context length. The process is:
+      </p>
+
+      <div class="swi-steps">
+        <div class="swi-step">
+          <div class="swi-step-number">1</div>
+          <div class="swi-step-content">
+            <h4>Base Model Training</h4>
+            <p>Train Phi-3 with standard RoPE at 4K context length. This establishes the base capabilities.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">2</div>
+          <div class="swi-step-content">
+            <h4>Short Fine-Tuning</h4>
+            <p>Fine-tune with LongRope on short-context data to fit the per-head scaling factors. This calibrates the scaling without requiring long sequences.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">3</div>
+          <div class="swi-step-content">
+            <h4>Long Context Fine-Tuning</h4>
+            <p>Train on long-context data (128K) to adapt attention patterns. Uses progressive context length increase for stability.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">4</div>
+          <div class="swi-step-content">
+            <h4>Deployment</h4>
+            <p>The model now supports 128K context without quality degradation. Requires no architectural changes at inference time.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 5: Blocksparse Attention -->
+      <h2 class="title">5. Blocksparse Attention and Triton Kernels</h2>
+
+      <p>
+        Standard dense attention has O(n²) memory and compute complexity, which makes 128K context windows extremely expensive. Phi-3 introduces a <strong>blocksparse attention</strong> mechanism implemented in custom Triton kernels that reduces the practical cost of long-context inference:
+      </p>
+
+      <h3 class="subtitle">5.1 Attention Pattern Design</h3>
+
+      <p>
+        The blocksparse pattern divides the attention matrix into blocks and restricts attention to a combination of local blocks (nearby tokens) and selective global blocks (important distant tokens). This is inspired by the observation that attention weights are typically sparse—most tokens attend primarily to a small number of nearby and semantically relevant tokens.
+      </p>
+
+      <pre><code>Blocksparse Attention Pattern:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Full 128K × 128K attention matrix (impossible to store):
+
+┌─────────────────────────────────────┐
+│ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │  ░ = masked (no attention)
+│ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │  ■ = local block
+│ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │  ● = global block
+│ ░░░■■■■■░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+│ ░░░░░░░░░■■■■■░░░░░░░░░░░░░●░░░░░░ │  Global blocks are
+│ ░░░░░░░░░░░░░░░■■■■■░░░░░░░░░░░░░░ │  sparsely placed to
+│ ░░░●░░░░░░░░░░░░░░░■■■■■░░░░░░░░░░ │  capture long-range
+│ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │  dependencies
+│ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+└─────────────────────────────────────┘
+
+Local blocks:  adjacent token windows (configurable block size)
+Global blocks: every N-th block, covering full sequence
+
+Memory: O(n × block_size) instead of O(n²)
+Compute: proportional to non-masked blocks
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</code></pre>
+
+      <h3 class="subtitle">5.2 Triton Kernel Implementation</h3>
+
+      <p>
+        The blocksparse attention is implemented using OpenAI's Triton compiler, which generates efficient GPU kernels for the sparse attention pattern. Key implementation details include:
+      </p>
+
+      <ul>
+        <li><strong>Block-level sparsity:</strong> The attention matrix is divided into fixed-size blocks (e.g., 64×64 tokens). The mask is computed at the block level, not the token level, reducing mask computation overhead.</li>
+        <li><strong>Fused softmax:</strong> The Triton kernel fuses the sparse matrix multiplication with softmax computation, avoiding materialization of the full attention matrix.</li>
+        <li><strong>Memory-efficient layout:</strong> Only the non-masked blocks are stored in memory, reducing peak memory from O(n²) to O(n × block_size × global_blocks).</li>
+        <li><strong>Flash-attention compatible:</strong> The kernel is designed to work alongside FlashAttention optimizations for the non-masked portions.</li>
+      </ul>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">⚡</div>
+        <div class="swi-callout-body">
+          <strong>Performance Impact:</strong> For a 128K context sequence, dense attention requires ~16 billion FLOPs per attention layer. Blocksparse attention with a block size of 64 and global block frequency of 16 reduces this to ~200 million FLOPs—an 80× reduction. The custom Triton kernels achieve this with negligible quality degradation on long-context benchmarks.
+        </div>
+      </div>
+
+      <!-- Section 6: MoE Architecture -->
+      <h2 class="title">6. Mixture of Experts (MoE) Architecture</h2>
+
+      <p>
+        The Phi-3-MoE variant (introduced in the Phi-3.5 family) applies Mixture of Experts to the Phi-3 architecture, achieving dense-model quality at a fraction of the inference cost. The key parameters are:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr>
+            <th>Component</th>
+            <th>Value</th>
+            <th>Detail</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Total Parameters</td>
+            <td class="swi-win">14B</td>
+            <td>Full model size</td>
+          </tr>
+          <tr>
+            <td>Active Parameters</td>
+            <td class="swi-win">~3.3B</td>
+            <td>Per forward pass (top-2 routing)</td>
+          </tr>
+          <tr>
+            <td>Number of Experts</td>
+            <td>16</td>
+            <td>Feed-forward network experts</td>
+          </tr>
+          <tr>
+            <td>Top-K Routing</td>
+            <td>2</td>
+            <td>Each token activates 2 of 16 experts</td>
+          </tr>
+          <tr>
+            <td>Routing Mechanism</td>
+            <td>SparseMixer</td>
+            <td>Mixed routing with load balancing</td>
+          </tr>
+          <tr>
+            <td>Inference Cost</td>
+            <td>~3.3B equivalent</td>
+            <td>Comparable to Phi-3-mini (3.8B dense)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 class="subtitle">6.1 SparseMixer Router</h3>
+
+      <p>
+        The SparseMixer routing mechanism improves upon standard top-k routing by combining a learned gating network with load-balancing regularization. The router computes:
+      </p>
+
+      <pre><code>SparseMixer Routing:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Input token: h ∈ R^d
+
+Router computation:
+  g = softmax(W_gate · h + b_gate)     gate logits over 16 experts
+  
+  Load balancing loss:
+    L_balance = N × Σ_i (f_i × P_i)
+    
+    where:
+      f_i = fraction of tokens routed to expert i
+      P_i = average gate probability for expert i
+      N   = number of experts (16)
+    
+  Total loss = task_loss + α × L_balance
+
+Top-2 selection:
+  expert_indices = topk(g, k=2)
+  output = Σ_{i ∈ expert_indices} g_i × Expert_i(h)
+
+Effect: Each token is processed by only 2 of 16 experts,
+reducing active parameters from 14B to ~3.3B.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</code></pre>
+
+      <h3 class="subtitle">6.2 Why MoE Matters for Mobile</h3>
+
+      <p>
+        MoE provides a unique advantage for edge deployment: the total model is large (14B, capturing rich knowledge), but each forward pass only activates a small subset (~3.3B). This means the model has the knowledge capacity of a 14B model but the compute cost of a ~3.3B model. For mobile deployment where inference speed is critical, this is a compelling tradeoff.
+      </p>
+
+      <p>
+        However, MoE introduces a memory overhead: all 14B parameters must be loaded into memory even though only ~3.3B are used per token. This is where quantization becomes essential—the 14B model can be quantized to INT4, reducing the memory footprint to ~7GB, which is feasible for modern mobile devices with 8-12GB RAM.
+      </p>
+
+      <!-- Section 7: Training Pipeline -->
+      <h2 class="title">7. Multi-Phase Training Pipeline</h2>
+
+      <p>
+        Phi-3's training pipeline follows a carefully staged approach that progressively increases data quality:
+      </p>
+
+      <div class="swi-steps">
+        <div class="swi-step">
+          <div class="swi-step-number">1</div>
+          <div class="swi-step-content">
+            <h4>Phase 1: Web-Scale Pretraining</h4>
+            <p>Train on ~3.3T tokens of filtered web data. Heavy deduplication and quality filtering. Establishes broad language and world knowledge.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">2</div>
+          <div class="swi-step-content">
+            <h4>Phase 2: Synthetic Data Injection</h4>
+            <p>Mix in ~1.6T tokens of synthetic textbook-quality data. Code-centric reasoning, math problems, and educational content. Significantly boosts reasoning capabilities.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">3</div>
+          <div class="swi-step-content">
+            <h4>Phase 3: High-Quality Curation</h4>
+            <p>Final pretraining stage with selected high-quality data. Teacher-model generated examples for complex reasoning tasks. Polish and refine capabilities.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">4</div>
+          <div class="swi-step-content">
+            <h4>Phase 4: SFT + DPO</h4>
+            <p>Supervised fine-tuning on curated instruction data, followed by Direct Preference Optimization. Post-training is critical—a significant portion of Phi-3's capability comes from this stage. See <a href="06-lora.html">Paper 06</a> for LoRA and <a href="10-dpo.html">Paper 10</a> for DPO theory.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">🔑</div>
+        <div class="swi-callout-body">
+          <strong>Post-Training Matters:</strong> The paper explicitly states that a significant portion of Phi-3's capability comes from careful SFT + DPO post-training, not just pretraining. This connects to <a href="13-sft-dpo-interaction.html">Paper 13's</a> finding that the SFT→DPO pipeline is complementary, with each stage contributing unique capabilities. For small models especially, post-training is where alignment and instruction-following are learned.
+        </div>
+      </div>
+
+      <!-- Section 8: SFT and DPO Post-Training -->
+      <h2 class="title">8. SFT and DPO Post-Training</h2>
+
+      <p>
+        The post-training pipeline for Phi-3 follows the established SFT→DPO pattern, but with important optimizations for small models:
+      </p>
+
+      <h3 class="subtitle">8.1 Supervised Fine-Tuning (SFT)</h3>
+
+      <p>
+        The SFT stage uses a curated dataset of high-quality instruction-response pairs. For small models, SFT data quality is especially critical because small models have less capacity to "average out" noisy demonstrations. The SFT dataset is constructed using:
+      </p>
+
+      <ul>
+        <li>Human-authored instruction-response pairs for general tasks</li>
+        <li>Synthetic data generated by larger models (GPT-4) for complex reasoning</li>
+        <li>Domain-specific examples for code, math, and science</li>
+        <li>Negative examples (what NOT to do) to improve safety and refusal behavior</li>
+      </ul>
+
+      <h3 class="subtitle">8.2 Direct Preference Optimization (DPO)</h3>
+
+      <p>
+        Following SFT, DPO is applied to align the model with human preferences. The DPO objective (see <a href="10-dpo.html">Paper 10</a> for full theory) trains the model to prefer chosen responses over rejected responses without requiring a separate reward model. For Phi-3, DPO is particularly important for:
+      </p>
+
+      <ul>
+        <li><strong>Safety alignment:</strong> Training the model to refuse harmful requests</li>
+        <li><strong>Helpfulness calibration:</strong> Balancing helpfulness against verbosity</li>
+        <li><strong>Tone consistency:</strong> Maintaining a professional, educational tone</li>
+      </ul>
+
+      <pre><code>Phi-3 DPO Training Configuration:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# Standard DPO loss (sigmoid variant)
+L_DPO = -E[σ(β × (log π_θ(y_w|x)/π_ref(y_w|x) 
+                  - log π_θ(y_l|x)/π_ref(y_l|x)))]
+
+where:
+  y_w = preferred (chosen) response
+  y_l = rejected response
+  β  = KL penalty coefficient (typically 0.1-0.2)
+  π_θ = policy model
+  π_ref = reference model (initial SFT checkpoint)
+
+Key parameters for Phi-3:
+  β = 0.1 (moderate preference weighting)
+  Learning rate: 1e-6 (lower than SFT to prevent instability)
+  Batch size: 64-128 preference pairs
+  Epochs: 1-2 (avoid overfitting to preference data)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</code></pre>
+
+      <!-- Section 9: Performance Benchmarks -->
+      <h2 class="title">9. Performance Benchmarks</h2>
+
+      <p>
+        The benchmark results are the paper's most compelling evidence. Phi-3-mini (3.8B) achieves performance competitive with models 10× larger:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th>Params</th>
+            <th>MMLU</th>
+            <th>GSM8K</th>
+            <th>HellaSwag</th>
+            <th>Arc-C</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Phi-3-mini</td>
+            <td class="swi-win">3.8B</td>
+            <td>69.0</td>
+            <td>82.5</td>
+            <td>75.7</td>
+            <td>83.4</td>
+          </tr>
+          <tr>
+            <td>GPT-3.5-turbo</td>
+            <td>~175B</td>
+            <td>70.0</td>
+            <td>81.6</td>
+            <td>78.5</td>
+            <td>85.2</td>
+          </tr>
+          <tr>
+            <td>Mixtral-8x7B</td>
+            <td>46.7B (12.9B active)</td>
+            <td>71.0</td>
+            <td>74.4</td>
+            <td>81.0</td>
+            <td>85.8</td>
+          </tr>
+          <tr>
+            <td>Llama-3-8B</td>
+            <td>8B</td>
+            <td>68.4</td>
+            <td>79.6</td>
+            <td>79.2</td>
+            <td>83.4</td>
+          </tr>
+          <tr>
+            <td>Phi-3-small</td>
+            <td>7B</td>
+            <td>75.3</td>
+            <td>87.2</td>
+            <td>79.5</td>
+            <td>88.5</td>
+          </tr>
+          <tr>
+            <td>Phi-3-medium</td>
+            <td>14B</td>
+            <td>78.0</td>
+            <td>90.5</td>
+            <td>82.3</td>
+            <td>90.0</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        The results are striking: Phi-3-mini at 3.8B matches GPT-3.5-turbo at ~175B on MMLU (69.0 vs 70.0) and exceeds it on GSM8K (82.5 vs 81.6). Phi-3-small at 7B surpasses both GPT-3.5 and Llama-3-8B across all benchmarks. This validates the data-optimal regime thesis: quality data, not parameter count, drives performance.
+      </p>
+
+      <div class="swi-pullquote">
+        <p>"A 3.8B model matching a 175B model on reasoning benchmarks is not a fluke—it is the result of careful data curation, progressive training stages, and effective post-training with SFT + DPO."</p>
+      </div>
+
+      <!-- Section 10: Mobile Deployment -->
+      <h2 class="title">10. Mobile and Edge Deployment</h2>
+
+      <p>
+        Phi-3's mobile deployment capabilities are a major differentiator. The paper provides detailed benchmarks for on-device inference:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr>
+            <th>Deployment Target</th>
+            <th>Model</th>
+            <th>Quantization</th>
+            <th>Memory</th>
+            <th>Speed</th>
+            <th>Context</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>iPhone (A16)</td>
+            <td class="swi-win">Phi-3-mini</td>
+            <td>INT4</td>
+            <td>1.8 GB</td>
+            <td>&gt;30 tok/s</td>
+            <td>128K</td>
+          </tr>
+          <tr>
+            <td>iPhone (A16)</td>
+            <td>Phi-3-mini-4k</td>
+            <td>INT4</td>
+            <td>1.8 GB</td>
+            <td>&gt;30 tok/s</td>
+            <td>4K</td>
+          </tr>
+          <tr>
+            <td>Android (Snapdragon 8 Gen 2)</td>
+            <td>Phi-3-mini</td>
+            <td>INT4</td>
+            <td>2.2 GB</td>
+            <td>&gt;25 tok/s</td>
+            <td>128K</td>
+          </tr>
+          <tr>
+            <td>Desktop GPU (RTX 3090)</td>
+            <td>Phi-3-medium</td>
+            <td>INT4</td>
+            <td>8.0 GB</td>
+            <td>&gt;100 tok/s</td>
+            <td>128K</td>
+          </tr>
+          <tr>
+            <td>Cloud (A100)</td>
+            <td>Phi-3-medium</td>
+            <td>FP16</td>
+            <td>28 GB</td>
+            <td>&gt;300 tok/s</td>
+            <td>128K</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 class="subtitle">10.1 Quantization Strategy</h3>
+
+      <p>
+        The INT4 quantization reduces Phi-3-mini from ~7.6 GB (FP16) to ~1.8 GB, making it feasible for mobile devices. The quantization uses a combination of GPTQ (weight-only quantization) and AWQ (activation-aware quantization) to minimize quality degradation. The paper notes that INT4 quantization of Phi-3-mini causes less than 1% degradation on most benchmarks—a testament to the model's robustness to quantization.
+      </p>
+
+      <h3 class="subtitle">10.2 Inference Optimization</h3>
+
+      <p>
+        Mobile inference benefits from several optimizations:
+      </p>
+
+      <ul>
+        <li><strong>KV-cache optimization:</strong> The 32K vocabulary size (Llama-2 tokenizer) reduces KV-cache memory compared to 100K tokenizers</li>
+        <li><strong>GQA (Grouped Query Attention):</strong> Phi-3-small uses 8 query heads with 2 KV heads, reducing KV-cache by 4×</li>
+        <li><strong>Blocksparse attention:</strong> Reduces memory for long-context inference on mobile devices</li>
+        <li><strong>ONNX Runtime:</strong> Mobile inference uses ONNX Runtime with hardware-specific optimizations (CoreML for iOS, NNAPI for Android)</li>
+      </ul>
+
+      <!-- Section 11: RAI Safety -->
+      <h2 class="title">11. RAI (Responsible AI) Safety</h2>
+
+      <p>
+        Phi-3 includes a comprehensive safety evaluation framework covering multiple risk categories:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr>
+            <th>Safety Category</th>
+            <th>Method</th>
+            <th>Phi-3 Performance</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Violence/Hate</td>
+            <td>DPO safety alignment + red-teaming</td>
+            <td>Refusal rate &gt;95%</td>
+          </tr>
+          <tr>
+            <td>Sexual Content</td>
+            <td>DPO safety alignment</td>
+            <td>Refusal rate &gt;98%</td>
+          </tr>
+          <tr>
+            <td>Self-Harm</td>
+            <td>DPO + system prompt engineering</td>
+            <td>Refusal rate &gt;97%</td>
+          </tr>
+          <tr>
+            <td>Illegal Activity</td>
+            <td>DPO safety alignment</td>
+            <td>Refusal rate &gt;96%</td>
+          </tr>
+          <tr>
+            <td>Promotion of Extremism</td>
+            <td>Red-teaming + DPO</td>
+            <td>Refusal rate &gt;94%</td>
+          </tr>
+          <tr>
+            <td>PII Extraction</td>
+            <td>Data filtering + DPO</td>
+            <td>Refusal rate &gt;99%</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        The safety evaluation follows Microsoft's Responsible AI (RAI) framework, which includes both automated red-teaming (using adversarial prompts generated by GPT-4) and manual red-teaming by human evaluators. The paper notes that small models can be particularly vulnerable to jailbreak attacks because they have less capacity for nuanced reasoning about safety boundaries. Phi-3 addresses this through aggressive DPO safety alignment and system-level guardrails.
+      </p>
+
+      <!-- Section 12: Limitations -->
+      <h2 class="title">12. Limitations</h2>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">⚠️</div>
+        <div class="swi-callout-body">
+          <strong>Key Limitations:</strong>
+        </div>
+      </div>
+
+      <p>
+        <strong>Data curation scalability.</strong> The data-optimal regime requires extensive human and model-in-the-loop curation. This process is expensive, time-consuming, and difficult to reproduce. The paper does not fully disclose the curation methodology, making independent reproduction challenging.
+      </p>
+
+      <p>
+        <strong>MoE deployment overhead.</strong> While the MoE variant reduces active parameters to ~3.3B, the full 14B model must be loaded into memory. This makes MoE less suitable for extreme memory-constrained devices (e.g., embedded systems with &lt;4GB RAM) compared to the 3.8B dense model.
+      </p>
+
+      <p>
+        <strong>LongRope limitations.</strong> The 128K context window is impressive, but quality may still degrade for tasks requiring very long-range dependencies (e.g., full-book summarization). The paper does not provide exhaustive long-context evaluation across diverse tasks.
+      </p>
+
+      <p>
+        <strong>Knowledge cutoff.</strong> Like all pretrained models, Phi-3 has a training data cutoff. The model may produce outdated information or fail on recent events. The small model size limits the amount of knowledge that can be stored.
+      </p>
+
+      <p>
+        <strong>Small model vulnerabilities.</strong> Small models are more susceptible to hallucination, especially for tasks requiring extensive world knowledge. The 3.8B model may confidently state incorrect facts, particularly for niche or specialized topics.
+      </p>
+
+      <!-- Section 13: Practical Implications -->
+      <h2 class="title">13. Practical Implications</h2>
+
+      <h3 class="subtitle">13.1 For Model Development</h3>
+
+      <p>
+        <strong>Invest in data, not just compute.</strong> Phi-3's most important lesson is that data quality drives performance more than model size. For teams with limited compute budgets, a smaller model with curated data may outperform a larger model with standard data. See <a href="03-phi-1-textbooks.html">Paper 03</a> for the original Phi-1 thesis.
+      </p>
+
+      <p>
+        <strong>Use SFT + DPO for post-training.</strong> The post-training pipeline is where small models gain their most important capabilities—instruction following, safety, and preference alignment. See <a href="06-lora.html">Paper 06</a> for LoRA fine-tuning and <a href="10-dpo.html">Paper 10</a> for DPO theory.
+      </p>
+
+      <h3 class="subtitle">13.2 For Deployment</h3>
+
+      <p>
+        <strong>Quantize aggressively.</strong> INT4 quantization of Phi-3-mini causes minimal quality degradation while reducing memory by 4×. For mobile deployment, this is the difference between feasible and impossible.
+      </p>
+
+      <p>
+        <strong>Use LongRope for long-context tasks.</strong> The 128K context window enables document-level tasks on mobile devices. This is a genuine capability gap compared to smaller-context mobile models.
+      </p>
+
+      <h3 class="subtitle">13.3 Cross-References to Other Papers</h3>
+
+      <ul>
+        <li><a href="03-phi-1-textbooks.html">Paper 03</a> established the data quality thesis that Phi-3 validates at scale</li>
+        <li><a href="06-lora.html">Paper 06</a> covers LoRA fine-tuning, relevant to Phi-3's post-training</li>
+        <li><a href="10-dpo.html">Paper 10</a> provides the DPO theory underlying Phi-3's preference alignment</li>
+        <li><a href="13-sft-dpo-interaction.html">Paper 13</a> validates Phi-3's SFT→DPO pipeline design</li>
+        <li><a href="14-deepseekmath.html">Paper 14</a>'s GRPO could replace DPO for future Phi-3 iterations</li>
+        <li><a href="17-qwen3.html">Paper 17</a> extends Phi-3's MoE concepts with thinking/non-thinking modes</li>
+      </ul>
+
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

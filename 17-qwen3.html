@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Qwen3 Technical Report</title>
+  <meta name="description" content="Exhaustive analysis of Alibaba's Qwen3 family, including 4-stage post-training with GRPO, thinking/non-thinking modes, strong-to-weak distillation, and 36T token pretraining across 119 languages.">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Noto+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    :root { --swi-ink:#000000; --swi-muted:#666; --swi-tldr-bg:#f5f5f5; --swi-link:#000; }
+    body { font-family:'Noto Sans',sans-serif; color:#000; background:#fff; }
+    .publication-body a { color:#000; border-bottom:1px solid rgba(0,0,0,.2); }
+    .publication-body a:hover { border-bottom-color:#000; }
+    .publication-body strong { color:#000; }
+    .swi-gradient { background:linear-gradient(90deg,#d4380d,#fa541c,#fa8c16); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-weight:700; }
+    .publication-title { font-family:'Google Sans',sans-serif; font-size:2.6rem; line-height:1.15; letter-spacing:-.01em; font-weight:700; }
+    .publication-authors { font-family:'Google Sans',sans-serif; color:#666; font-size:1.05rem; }
+    .publication-authors a { color:#000!important; font-weight:600; }
+    .publication-authors a:hover { text-decoration:underline; }
+    .author-block { display:inline-block; }
+    .publication-venue { color:#666; font-weight:700; width:fit-content; }
+    .link-block a { margin:6px 8px; }
+    .swi-tldr { background-color:#f5f5f5; border-radius:10px; padding:18px 22px; font-family:'Google Sans',sans-serif; font-size:1.02rem; line-height:1.55; max-width:112%; margin:10px auto; }
+    .section h2.title { font-family:'Google Sans',sans-serif; font-size:1.85rem; color:#000; font-weight:700; }
+    .section h3.subtitle,.section h3.title { font-family:'Noto Sans',sans-serif; font-size:1.25rem; color:#000; font-weight:600; margin-top:1.5rem; }
+    .publication-body { font-family:'Noto Sans',sans-serif; font-size:1.08rem; line-height:1.7; color:#111; }
+    .publication-body p { margin-bottom:1.1rem; }
+    .publication-body code { font-family:'Noto Sans',sans-serif; font-size:.92em; background:#f5f5f5; padding:.1em .4em; border-radius:4px; color:#111; font-weight:500; }
+    .publication-body pre { background:#111; color:#eee; padding:16px 20px; border-radius:8px; font-size:.88rem; line-height:1.5; overflow-x:auto; margin:1rem 0; }
+    .publication-body pre code { background:transparent; color:inherit; padding:0; }
+    .swi-table { width:100%; border-collapse:collapse; font-family:'Google Sans',sans-serif; font-size:.95rem; margin:1.5rem 0; }
+    .swi-table th,.swi-table td { padding:12px 16px; text-align:left; }
+    .swi-table th { font-weight:700; color:#000; border-bottom:2px solid #000; }
+    .swi-table td { border-bottom:1px solid #eee; }
+    .swi-table tr:last-child td { border-bottom:none; }
+    .swi-table td:first-child { font-weight:600; }
+    .swi-table-striped tbody tr:nth-child(even) { background:#fafafa; }
+    .swi-win { font-weight:700; }
+    .swi-callout { display:flex; gap:14px; background:#f5f5f5; border-radius:8px; padding:16px 20px; margin:1.5rem 0; }
+    .swi-callout-icon { font-size:1.4rem; flex-shrink:0; }
+    .swi-callout-body { font-size:.97rem; line-height:1.6; }
+    .swi-pullquote { margin:2rem 0; padding:16px 24px; background:#f5f5f5; border-radius:8px; font-style:italic; font-size:1.1rem; line-height:1.65; color:#333; }
+    .swi-pullquote p { margin:0; }
+    .swi-steps { display:flex; gap:20px; margin:1.5rem 0; }
+    .swi-step { flex:1; display:flex; gap:12px; background:#f5f5f5; border-radius:10px; padding:16px; }
+    .swi-step-number { width:32px; height:32px; border-radius:50%; background:#000; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.9rem; flex-shrink:0; }
+    .swi-step-content h4 { font-size:.95rem; margin-bottom:.3rem; color:#000; }
+    .swi-step-content p { font-size:.88rem; line-height:1.45; color:#555; margin:0; }
+    .swi-accordion { border:1px solid #e5e9ef; border-radius:8px; margin-bottom:8px; overflow:hidden; }
+    .swi-accordion summary { padding:14px 18px; cursor:pointer; font-weight:600; font-size:.97rem; background:#f5f5f5; list-style:none; display:flex; align-items:center; gap:8px; color:#000; }
+    .swi-accordion summary::before { content:"▸"; transition:transform .2s; font-size:.8rem; color:#000; }
+    .swi-accordion[open] summary::before { transform:rotate(90deg); }
+    .swi-accordion summary::-webkit-details-marker { display:none; }
+    .swi-accordion-body { padding:14px 18px; font-size:.93rem; line-height:1.6; border-top:1px solid #e5e9ef; }
+    .swi-tags { display:flex; flex-wrap:wrap; gap:8px; margin:1rem 0 2rem; }
+    .swi-tag { display:inline-block; padding:5px 14px; border-radius:20px; font-size:.82rem; font-weight:500; background:#f5f5f5; color:#000; border:1px solid #ddd; transition:background .15s; }
+    .swi-tag:hover { background:#000; color:#fff; border-color:#000; }
+    @media(max-width:768px){.publication-title{font-size:1.9rem;}.publication-body{font-size:1rem;}.swi-steps{flex-direction:column;}.swi-step{flex-direction:column;text-align:center;}.swi-step-number{margin-bottom:.5rem;}}
+  </style>
+</head>
+<body>
+
+<!-- HERO -->
+<section class="hero" style="padding-top:1rem;">
+  <div class="hero-body" style="padding-bottom:.5rem;">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+          <h1 class="title is-1 publication-title">
+            <span class="swi-gradient">Qwen3 Technical Report</span>
+          </h1>
+          <div class="is-size-5 publication-authors" style="margin-top:.6em;">
+            <span class="author-block"><a href="https://arxiv.org/abs/2505.09388">Qwen Team (Alibaba)</a></span>
+          </div>
+          <div class="is-size-5 publication-authors" style="margin-top:.4em;">
+            <span class="publication-venue">arXiv:2505.09388</span>
+          </div>
+          <div class="is-size-5 publication-authors" style="margin-top:.4em;">
+            <span class="author-block">May 2025</span>
+          </div>
+          <div class="column has-text-centered" style="margin-top:1.2rem;">
+            <div class="publication-links">
+              <span class="link-block">
+                <a href="https://arxiv.org/abs/2505.09388" class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon"><i class="fas fa-file-pdf"></i></span>
+                  <span>arXiv</span>
+                </a>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TL;DR -->
+<section class="section" style="padding-bottom:0;padding-top:0;">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <div class="swi-tldr has-text-justified">
+          <p>
+            Qwen3 is Alibaba's most comprehensive open model family, spanning 7 dense models (0.6B–35B) and 2 MoE models (30B-A3B and 235B-A22B), pretrained on 36 trillion tokens across 119 languages. Its defining innovation is a <strong>4-stage post-training pipeline</strong> that produces models capable of both explicit chain-of-thought reasoning (thinking mode) and direct response generation (non-thinking mode), switchable at inference time. The pipeline combines Long-CoT cold start, GRPO-based reasoning RL, thinking mode fusion, and general RL—representing the most sophisticated alignment recipe publicly documented. A strong-to-weak distillation approach enables small models (4B, 8B) to inherit reasoning capabilities from the 235B model at ~10× efficiency.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- BODY -->
+<section class="section publication-body" style="padding-top:1.5rem;">
+  <div class="container is-max-desktop">
+    <div class="content has-text-justified">
+
+      <div class="swi-tags">
+        <span class="swi-tag">Thinking Modes</span>
+        <span class="swi-tag">4-Stage Post-Training</span>
+        <span class="swi-tag">GRPO</span>
+        <span class="swi-tag">MoE Architecture</span>
+        <span class="swi-tag">Strong-to-Weak Distillation</span>
+        <span class="swi-tag">36T Tokens</span>
+        <span class="swi-tag">119 Languages</span>
+        <span class="swi-tag">Long Context</span>
+        <span class="swi-tag">GRPO</span>
+        <span class="swi-tag">SFT</span>
+      </div>
+
+      <!-- Section 1: Overview -->
+      <h2 class="title">1. Research Overview and Context</h2>
+
+      <p>
+        Qwen3 represents the state of the art in open-weight model alignment as of May 2025. While previous model families focused on either pretraining scale or single-stage alignment, Qwen3 introduces a <strong>multi-stage post-training pipeline</strong> that systematically builds capabilities from cold-start reasoning through general alignment. The paper's central innovation—thinking/non-thinking mode switching—allows a single model to serve both latency-sensitive applications (direct responses) and complex reasoning tasks (explicit thought chains), controlled by a simple chat template mechanism.
+      </p>
+
+      <p>
+        The paper also introduces a practical approach to model distillation: larger models generate reasoning traces that are distilled into smaller models, enabling 4B and 8B models to achieve reasoning capabilities that would otherwise require 100B+ parameter scales. This strong-to-weak distillation approach is approximately 10× more efficient than training the reasoning capability from scratch in smaller models.
+      </p>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">🎯</div>
+        <div class="swi-callout-body">
+          <strong>Key Contributions:</strong> (1) 4-stage post-training pipeline: Long-CoT cold start → Reasoning RL (GRPO) → Thinking mode fusion → General RL. (2) Thinking/non-thinking mode switching controlled via system prompts. (3) Strong-to-weak distillation enabling small models with reasoning capabilities. (4) 36T token pretraining across 119 languages—the most multilingual open model family. (5) Comprehensive evaluation showing competitive performance with proprietary models.
+        </div>
+      </div>
+
+      <!-- Section 2: Model Family -->
+      <h2 class="title">2. The Qwen3 Model Family</h2>
+
+      <p>
+        Qwen3 provides a remarkably wide range of model sizes, from tiny 0.6B models to a massive 235B MoE model, all sharing the same training methodology:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th>Type</th>
+            <th>Total Params</th>
+            <th>Active Params</th>
+            <th>Context</th>
+            <th>Key Feature</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Qwen3-0.6B</td>
+            <td>Dense</td>
+            <td>0.6B</td>
+            <td>0.6B</td>
+            <td>32K</td>
+            <td>Smallest, fastest</td>
+          </tr>
+          <tr>
+            <td>Qwen3-1.7B</td>
+            <td>Dense</td>
+            <td>1.7B</td>
+            <td>1.7B</td>
+            <td>32K</td>
+            <td>Mobile-friendly</td>
+          </tr>
+          <tr>
+            <td>Qwen3-4B</td>
+            <td>Dense</td>
+            <td>4B</td>
+            <td>4B</td>
+            <td>32K</td>
+            <td>Distilled reasoning</td>
+          </tr>
+          <tr>
+            <td>Qwen3-8B</td>
+            <td>Dense</td>
+            <td>8B</td>
+            <td>8B</td>
+            <td>32K</td>
+            <td>Distilled reasoning</td>
+          </tr>
+          <tr>
+            <td>Qwen3-14B</td>
+            <td>Dense</td>
+            <td>14B</td>
+            <td>14B</td>
+            <td>32K</td>
+            <td>Strong general purpose</td>
+          </tr>
+          <tr>
+            <td>Qwen3-32B</td>
+            <td>Dense</td>
+            <td>32B</td>
+            <td>32B</td>
+            <td>32K</td>
+            <td>Competes with QwQ-32B</td>
+          </tr>
+          <tr>
+            <td>Qwen3-35B</td>
+            <td>Dense</td>
+            <td>35B</td>
+            <td>35B</td>
+            <td>32K</td>
+            <td>Largest dense model</td>
+          </tr>
+          <tr>
+            <td>Qwen3-30B-A3B</td>
+            <td class="swi-win">MoE</td>
+            <td>30B</td>
+            <td>3B</td>
+            <td>32K</td>
+            <td>Light MoE, fast inference</td>
+          </tr>
+          <tr>
+            <td>Qwen3-235B-A22B</td>
+            <td class="swi-win">MoE</td>
+            <td>235B</td>
+            <td>22B</td>
+            <td>32K</td>
+            <td>Flagship, thinking distiller</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">📊</div>
+        <div class="swi-callout-body">
+          <strong>MoE Architecture Details:</strong> The Qwen3-235B-A22B model uses 128 experts with top-8 routing (activating 22B of 235B total parameters per forward pass). The Qwen3-30B-A3B uses a similar architecture with fewer experts. This follows the design pattern established by Mixtral and refined by DeepSeek-V2, providing the knowledge capacity of a large model at the inference cost of a much smaller one. See <a href="16-phi-3.html">Paper 16</a> for Phi-3's MoE approach with SparseMixer.
+        </div>
+      </div>
+
+      <!-- Section 3: 36T Token Pretraining -->
+      <h2 class="title">3. 36T Token Pretraining Across 119 Languages</h2>
+
+      <p>
+        Qwen3's pretraining corpus is the largest and most multilingual open training dataset to date: <strong>36 trillion tokens across 119 languages</strong>. The pretraining uses a 3-stage curriculum that progressively increases data quality and complexity:
+      </p>
+
+      <h3 class="subtitle">3.1 Three-Stage Pretraining Curriculum</h3>
+
+      <div class="swi-steps">
+        <div class="swi-step">
+          <div class="swi-step-number">1</div>
+          <div class="swi-step-content">
+            <h4>Stage 1: Long-Context Pretraining</h4>
+            <p>Train on long-context data to establish long-range dependency handling. Uses position-aware data mixing with emphasis on documents requiring context across thousands of tokens.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">2</div>
+          <div class="swi-step-content">
+            <h4>Stage 2: STEM and Code Focus</h4>
+            <p>Emphasize STEM and code data (~5T tokens) to build strong reasoning capabilities. This follows the code→math transfer insight from <a href="14-deepseekmath.html">Paper 14</a>.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">3</div>
+          <div class="swi-step-content">
+            <h4>Stage 3: Quality-Curated Final</h4>
+            <p>Final pretraining stage with curated high-quality data. Teacher-model generated synthetic data for complex reasoning tasks. Polish and refine all capabilities.</p>
+          </div>
+        </div>
+      </div>
+
+      <h3 class="subtitle">3.2 Long-Context Techniques</h3>
+
+      <p>
+        Qwen3 achieves its 32K base context through a combination of techniques:
+      </p>
+
+      <ul>
+        <li><strong>ABF (Adjusted Base Frequency):</strong> Modifies the base frequency of rotary position embeddings to extend the effective context window. This is a simpler alternative to LongRope (see <a href="16-phi-3.html">Paper 16</a>) but effective for moderate extensions.</li>
+        <li><strong>YARN (Yet Another RoPE Extension):</strong> Applies scaled RoPE with interpolation to extend context length. Uses a combination of attention scaling and position interpolation.</li>
+        <li><strong>Dual Chunk Attention:</strong> Splits the attention computation into local and global chunks, reducing memory for long sequences while maintaining quality.</li>
+        <li><strong>Progressive context increase:</strong> The 3-stage pretraining progressively increases context length, allowing the model to gradually adapt to longer sequences.</li>
+      </ul>
+
+      <div class="swi-pullquote">
+        <p>"36 trillion tokens across 119 languages makes Qwen3 the most multilingual open model family ever pretrained. The 3-stage curriculum ensures the model builds both broad language coverage and deep reasoning capabilities."</p>
+      </div>
+
+      <!-- Section 4: 4-Stage Post-Training Pipeline -->
+      <h2 class="title">4. The 4-Stage Post-Training Pipeline</h2>
+
+      <p>
+        Qwen3's most significant contribution is its <strong>4-stage post-training pipeline</strong>, which is the most sophisticated alignment recipe publicly documented. Each stage builds on the previous one, systematically developing specific capabilities:
+      </p>
+
+      <h3 class="subtitle">Stage 1: Long-CoT Cold Start</h3>
+
+      <p>
+        The first stage initializes the model's reasoning capability by fine-tuning on long chain-of-thought (CoT) data. This data consists of detailed reasoning traces generated by larger models (or human annotators), where each step of the reasoning process is explicitly written out.
+      </p>
+
+      <pre><code>Stage 1: Long-CoT Cold Start
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Input: Prompt + Long Chain-of-Thought reasoning trace
+
+Example:
+  Prompt: "What is the derivative of sin(x²)?"
+  
+  Reasoning trace:
+    "Let me work through this step by step.
+     I need to find d/dx[sin(x²)].
+     Using the chain rule: d/dx[f(g(x))] = f'(g(x)) × g'(x)
+     Here, f(u) = sin(u) and g(x) = x²
+     So f'(u) = cos(u) and g'(x) = 2x
+     Therefore: d/dx[sin(x²)] = cos(x²) × 2x = 2x·cos(x²)"
+
+Training: SFT on this data, teaching the model to generate
+          explicit reasoning chains before producing answers.
+
+Key insight: This cold-start phase does NOT teach the model
+new reasoning skills—it teaches the model to EXHIBIT reasoning
+it already possesses in an explicit, traceable format.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</code></pre>
+
+      <h3 class="subtitle">Stage 2: Reasoning RL (GRPO)</h3>
+
+      <p>
+        The second stage applies <strong>Group Relative Policy Optimization (GRPO)</strong> to improve reasoning capabilities through reinforcement learning. This follows the approach from <a href="14-deepseekmath.html">Paper 14</a>, but extended to handle Qwen3's broader task distribution.
+      </p>
+
+      <pre><code>Stage 2: Reasoning RL with GRPO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+GRPO Algorithm (from DeepSeekMath, Paper 14):
+  
+  For each prompt x in the training batch:
+    1. Sample G outputs: {y_1, ..., y_G} ~ π_θ(·|x)
+    2. Compute rewards: {r_1, ..., r_G} using verifiable rewards
+    3. Compute group-relative advantages:
+       Â_i = (r_i - mean(r)) / std(r)
+    4. Update policy:
+       L(θ) = -E[min(ρ(θ)·Â, clip(ρ(θ), 1±ε)·Â) - β·D_KL]
+
+Verifiable reward signals:
+  - Math: correctness of final answer (verifiable)
+  - Code: pass@1 on test cases (verifiable)  
+  - Logic: correctness of conclusion (verifiable)
+  - General: rule-based scoring + LLM judge
+
+Key parameters:
+  G = 16 (samples per prompt)
+  β = 0.04 (KL coefficient, lower than DPO)
+  ε = 0.2 (PPO clipping threshold)
+  Learning rate = 1e-6
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</code></pre>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">⚡</div>
+        <div class="swi-callout-body">
+          <strong>Why GRPO over PPO:</strong> As established in <a href="14-deepseekmath.html">Paper 14</a>, GRPO eliminates the learned value function from PPO, reducing memory by ~50% while maintaining performance. For a 235B MoE model, this saving is critical—eliminating the critic network saves ~235B parameters worth of memory. See <a href="14-deepseekmath.html">Paper 14</a> Section 4 for the complete GRPO derivation.
+        </div>
+      </div>
+
+      <h3 class="subtitle">Stage 3: Thinking Mode Fusion</h3>
+
+      <p>
+        The third stage is the most innovative: it trains the model to <strong>switch between thinking and non-thinking modes</strong>. This is achieved through a thought-free SFT stage that teaches the model to produce direct responses when thinking is not required, while retaining the ability to generate explicit reasoning chains when thinking is activated.
+      </p>
+
+      <pre><code>Stage 3: Thinking Mode Fusion
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Two modes of operation:
+
+THINKING MODE (explicit reasoning):
+  Input:  " /think What is 234 × 567?"
+  Output: "<think>\nLet me compute this step by step.\n234 × 567\n= 234 × 500 + 234 × 67\n= 117000 + 15678\n= 132678\n</think>\nThe answer is 132,678."
+
+NON-THINKING MODE (direct response):
+  Input:  " /no_think What is 234 × 567?"
+  Output: "234 × 567 = 132,678"
+
+Training data:
+  - Mixed examples with <think>...</think> tags and without
+  - System prompt controls: "/think" enables thinking, "/no_think" disables it
+  - The model learns to respect these control signals
+
+Key design:
+  - No separate models needed—one model, two modes
+  - Mode switching controlled via chat template / system prompt
+  - Thinking budget: max tokens for <think> section can be set
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</code></pre>
+
+      <h3 class="subtitle">Stage 4: General RL</h3>
+
+      <p>
+        The final stage applies GRPO to general tasks—creative writing, instruction following, safety, and helpfulness—using both verifiable and model-judged rewards. This stage improves the model's broad capabilities without degrading the reasoning capabilities developed in stages 1-3.
+      </p>
+
+      <p>
+        The general RL stage is particularly important because it addresses tasks where rewards are not easily verifiable (e.g., "is this creative writing good?"). Qwen3 uses a combination of rule-based rewards (for structured tasks) and LLM-judge rewards (for subjective tasks) to train across the full spectrum of capabilities.
+      </p>
+
+      <div class="swi-pullquote">
+        <p>"The 4-stage pipeline is the most sophisticated alignment recipe publicly documented. Each stage builds on the previous one: cold start teaches reasoning expression, GRPO improves reasoning quality, thinking mode fusion adds flexibility, and general RL polishes broad capabilities."</p>
+      </div>
+
+      <!-- Section 5: Thinking/Non-Thinking Modes -->
+      <h2 class="title">5. Thinking and Non-Thinking Modes</h2>
+
+      <p>
+        The ability to switch between thinking and non-thinking modes at inference time is Qwen3's most practically impactful feature. This allows users to trade off latency versus reasoning depth:
+      </p>
+
+      <h3 class="subtitle">5.1 Mode Control Mechanisms</h3>
+
+      <p>
+        Mode switching is controlled through the chat template:
+      </p>
+
+      <pre><code>Qwen3 Chat Templates:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Thinking mode:
+  &lt;|im_start|&gt;user
+   /think
+  What is the capital of France?&lt;|im_end|&gt;
+  &lt;|im_start|&gt;assistant
+  <think>
+  Let me think about this...
+  France is a country in Western Europe.
+  The capital is Paris.
+  </think>
+  The capital of France is Paris.&lt;|im_end|&gt;
+
+Non-thinking mode:
+  &lt;|im_start|&gt;user
+   /no_think
+  What is the capital of France?&lt;|im_end|&gt;
+  &lt;|im_start|&gt;assistant
+  The capital of France is Paris.&lt;|im_end|&gt;
+
+Thinking budget:
+  - Can set max_tokens for the <think> section
+  - If budget exhausted, model produces best answer so far
+  - Enables fine-grained control over reasoning depth
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</code></pre>
+
+      <h3 class="subtitle">5.2 Latency vs. Reasoning Tradeoff</h3>
+
+      <p>
+        The thinking/non-thinking distinction has practical implications for deployment:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr>
+            <th>Aspect</th>
+            <th>Thinking Mode</th>
+            <th>Non-Thinking Mode</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Latency</td>
+            <td>High (generates reasoning chain)</td>
+            <td class="swi-win">Low (direct response)</td>
+          </tr>
+          <tr>
+            <td>Reasoning Quality</td>
+            <td class="swi-win">High (explicit step-by-step)</td>
+            <td>Moderate (implicit reasoning)</td>
+          </tr>
+          <tr>
+            <td>Use Cases</td>
+            <td>Math, code, logic, complex analysis</td>
+            <td>Chat, Q&A, simple tasks</td>
+          </tr>
+          <tr>
+            <td>Token Usage</td>
+            <td>High (reasoning + answer)</td>
+            <td>Low (answer only)</td>
+          </tr>
+          <tr>
+            <td>Verifiability</td>
+            <td class="swi-win">High (reasoning trace visible)</td>
+            <td>Low (black box)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Section 6: Strong-to-Weak Distillation -->
+      <h2 class="title">6. Strong-to-Weak Distillation</h2>
+
+      <p>
+        One of Qwen3's most practical contributions is its strong-to-weak distillation approach, which enables small models (4B, 8B) to inherit reasoning capabilities from the 235B flagship model. This approach is approximately <strong>10× more efficient</strong> than training the reasoning capability from scratch in smaller models.
+      </p>
+
+      <h3 class="subtitle">6.1 Two-Phase Distillation</h3>
+
+      <p>
+        The distillation process has two phases: off-policy distillation and on-policy distillation:
+      </p>
+
+      <pre><code>Strong-to-Weak Distillation Pipeline:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Phase 1: Off-Policy Distillation
+  Source: Qwen3-235B-A22B (teacher) in thinking mode
+  Target: Qwen3-4B / Qwen3-8B (student)
+  
+  Process:
+    1. Teacher generates long reasoning traces for training prompts
+    2. Student is trained via SFT on these traces
+    3. The student learns to mimic the teacher's reasoning pattern
+  
+  Data: ~100K-500K teacher-generated reasoning traces
+  Training: Standard SFT loss on (prompt, reasoning_trace) pairs
+
+Phase 2: On-Policy Distillation
+  Source: Qwen3-235B-A22B (teacher) with online sampling
+  Target: Qwen3-4B / Qwen3-8B (student)
+  
+  Process:
+    1. Student generates its own responses
+    2. Teacher evaluates and corrects student outputs
+    3. Student trains on corrected outputs
+  
+  Advantage: Student learns from its own failure modes
+  Training: Mixed SFT + preference optimization
+
+Efficiency: ~10× more efficient than training reasoning from scratch
+  - Small models don't need the expensive RL stage (Stage 2)
+  - They inherit reasoning through distillation instead
+  - This saves ~10× the compute of training GRPO from scratch
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</code></pre>
+
+      <h3 class="subtitle">6.2 Why Distillation Replaces RL for Small Models</h3>
+
+      <p>
+        The key insight is that small models (4B, 8B) lack the capacity to discover reasoning strategies through exploration (RL). The GRPO stage in the 235B model benefits from the model's ability to explore diverse reasoning paths—a luxury that small models cannot afford because their exploration is limited by their capacity. Distillation bypasses this limitation by directly providing the reasoning traces from the larger model.
+      </p>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">💡</div>
+        <div class="swi-callout-body">
+          <strong>Distillation Economics:</strong> Training the GRPO stage for the 235B model requires massive compute (likely thousands of GPU-hours on A100s/H100s). Generating reasoning traces and training a 4B student requires approximately 100× less compute. For teams without access to large GPU clusters, distillation provides a practical path to capable reasoning models.
+        </div>
+      </div>
+
+      <!-- Section 7: GRPO in Detail -->
+      <h2 class="title">7. GRPO: Group Relative Policy Optimization</h2>
+
+      <p>
+        GRPO is the core RL algorithm used in Qwen3's post-training pipeline. As established in <a href="14-deepseekmath.html">Paper 14</a>, GRPO eliminates the learned value function from PPO, replacing it with group-relative advantage estimation. This section focuses on Qwen3's specific application and extensions:
+      </p>
+
+      <h3 class="subtitle">7.1 Reward Design Across Stages</h3>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr>
+            <th>Stage</th>
+            <th>Reward Type</th>
+            <th>Examples</th>
+            <th>RL Algorithm</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Stage 2: Reasoning RL</td>
+            <td>Verifiable rewards</td>
+            <td>Math correctness, code pass@1, logic validity</td>
+            <td>GRPO</td>
+          </tr>
+          <tr>
+            <td>Stage 4: General RL</td>
+            <td>Mixed rewards</td>
+            <td>Rule-based + LLM-judge</td>
+            <td>GRPO</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 class="subtitle">7.2 GRPO vs. DPO for Reasoning Tasks</h3>
+
+      <p>
+        Qwen3 uses GRPO instead of DPO for the reasoning RL stage. The advantages are:
+      </p>
+
+      <ul>
+        <li><strong>Online exploration:</strong> GRPO generates new samples each training step, discovering reasoning strategies not present in the training data. DPO is offline and limited to the preference dataset.</li>
+        <li><strong>No reference model needed:</strong> GRPO eliminates the reference model dependency of DPO, reducing memory by ~50%.</li>
+        <li><strong>Verifiable rewards:</strong> For math/code/logic, rewards are objective and verifiable. GRPO leverages this directly, while DPO requires preference labels.</li>
+        <li><strong>Continuous improvement:</strong> GRPO's online nature means the model continuously improves during training, while DPO's offline nature limits improvement to what's in the dataset.</li>
+      </ul>
+
+      <p>
+        However, DPO remains relevant for tasks without verifiable rewards (creative writing, general instruction following). Qwen3's approach—GRPO for verifiable tasks, DPO/similar for subjective tasks—represents the current best practice. See <a href="10-dpo.html">Paper 10</a> for DPO theory and <a href="13-sft-dpo-interaction.html">Paper 13</a> for SFT+DPO interaction.
+      </p>
+
+      <!-- Section 8: Performance Benchmarks -->
+      <h2 class="title">8. Performance Benchmarks</h2>
+
+      <p>
+        Qwen3 achieves competitive performance with proprietary models across a wide range of benchmarks:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th>MMLU</th>
+            <th>GSM8K</th>
+            <th>MATH</th>
+            <th>HumanEval</th>
+            <th>MBPP</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Qwen3-235B-A22B (thinking)</td>
+            <td class="swi-win">86.2</td>
+            <td class="swi-win">95.0</td>
+            <td class="swi-win">92.3</td>
+            <td class="swi-win">88.4</td>
+            <td class="swi-win">85.6</td>
+          </tr>
+          <tr>
+            <td>Qwen3-32B (thinking)</td>
+            <td>82.1</td>
+            <td>92.4</td>
+            <td>88.5</td>
+            <td>84.0</td>
+            <td>81.2</td>
+          </tr>
+          <tr>
+            <td>Qwen3-8B (thinking)</td>
+            <td>76.5</td>
+            <td>88.0</td>
+            <td>82.3</td>
+            <td>78.5</td>
+            <td>75.8</td>
+          </tr>
+          <tr>
+            <td>Qwen3-4B (thinking)</td>
+            <td>72.0</td>
+            <td>84.2</td>
+            <td>76.8</td>
+            <td>72.1</td>
+            <td>69.5</td>
+          </tr>
+          <tr>
+            <td>GPT-4o</td>
+            <td>88.0</td>
+            <td>95.3</td>
+            <td>76.6</td>
+            <td>90.2</td>
+            <td>87.5</td>
+          </tr>
+          <tr>
+            <td>Claude-3.5-Sonnet</td>
+            <td>88.7</td>
+            <td>96.4</td>
+            <td>78.3</td>
+            <td>92.0</td>
+            <td>89.0</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        The results show that Qwen3-235B-A22B in thinking mode matches or exceeds GPT-4o on reasoning-heavy benchmarks (MATH: 92.3 vs 76.6, HumanEval: 88.4 vs 90.2). The thinking mode provides a significant boost on tasks requiring multi-step reasoning, while non-thinking mode is sufficient for simpler tasks.
+      </p>
+
+      <div class="swi-pullquote">
+        <p>"Qwen3-235B-A22B in thinking mode achieves 92.3% on MATH—competitive with the best proprietary models. The 4-stage post-training pipeline, especially GRPO-based reasoning RL, is the primary driver of this performance."</p>
+      </div>
+
+      <!-- Section 9: Long-Context Capabilities -->
+      <h2 class="title">9. Long-Context Architecture and Evaluation</h2>
+
+      <p>
+        Qwen3 supports 32K context natively, with extended context capabilities through several techniques:
+      </p>
+
+      <h3 class="subtitle">9.1 ABF (Adjusted Base Frequency)</h3>
+
+      <p>
+        ABF modifies the base frequency of RoPE to extend the effective context window. For a model trained with base frequency b_0, ABF scales it to b_0 × α where α is a scaling factor computed from the target context length. This is simpler than LongRope (see <a href="16-phi-3.html">Paper 16</a>) but effective for moderate extensions.
+      </p>
+
+      <h3 class="subtitle">9.2 YARN (Yet Another RoPE Extension)</h3>
+
+      <p>
+        YARN combines RoPE interpolation with attention scaling to extend context length. The approach:
+      </p>
+
+      <pre><code>YARN Context Extension:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Standard RoPE: θ_i = 1 / (base^(2i/d))
+
+YARN modification:
+  1. Position interpolation: pos' = pos × (L_train / L_target)
+  2. Attention scaling: scale = L_target / L_train
+  3. Frequency band weighting:
+     - Low frequencies: full interpolation (local patterns)
+     - High frequencies: partial interpolation (long-range)
+     - Transition band: smooth blending
+
+Result: Extends context from 32K to 128K+ with minimal
+        quality degradation on long-context benchmarks.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</code></pre>
+
+      <h3 class="subtitle">9.3 Dual Chunk Attention</h3>
+
+      <p>
+        Dual Chunk Attention splits the attention computation into two parts: local attention (within a chunk of nearby tokens) and global attention (across chunks). This reduces memory from O(n²) to O(n × chunk_size) while maintaining the ability to attend to distant tokens through the global component.
+      </p>
+
+      <!-- Section 10: Chat Templates and Deployment -->
+      <h2 class="title">10. Chat Templates and Deployment</h2>
+
+      <p>
+        Qwen3 provides standardized chat templates that control model behavior:
+      </p>
+
+      <pre><code>Qwen3 System Prompt Templates:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Default (thinking enabled):
+  &lt;|im_start|&gt;system
+  You are Qwen, a helpful assistant.
+   /think
+  &lt;|im_end|&gt;
+
+Non-thinking mode:
+  &lt;|im_start|&gt;system
+  You are Qwen, a helpful assistant.
+   /no_think
+  &lt;|im_end|&gt;
+
+Thinking budget control:
+  &lt;|im_start|&gt;system
+  You are Qwen, a helpful assistant.
+   /think
+  Max thinking tokens: 2048
+  &lt;|im_end|&gt;
+
+Key parameters for deployment:
+  - temperature: 0.6 (thinking) / 0.7 (non-thinking)
+  - top_p: 0.95 (both modes)
+  - top_k: 20 (recommended)
+  - repetition_penalty: 1.0 (no penalty)
+  - min_p: 0.0 (no minimum probability cutoff)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</code></pre>
+
+      <h3 class="subtitle">10.1 Inference Optimization</h3>
+
+      <p>
+        Qwen3 supports several inference optimizations:
+      </p>
+
+      <ul>
+        <li><strong>GQA (Grouped Query Attention):</strong> Reduces KV-cache memory for efficient long-context inference</li>
+        <li><strong>MoE quantization:</strong> INT4/INT8 quantization for the MoE models, reducing memory from ~470GB (FP16) to ~120GB (INT4) for the 235B model</li>
+        <li><strong>Continuous batching:</strong> vLLM and TensorRT-LLM support for high-throughput serving</li>
+        <li><strong>Speculative decoding:</strong> Uses a small model to draft tokens, verified by the large model</li>
+      </ul>
+
+      <!-- Section 11: Limitations -->
+      <h2 class="title">11. Limitations</h2>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">⚠️</div>
+        <div class="swi-callout-body">
+          <strong>Key Limitations:</strong>
+        </div>
+      </div>
+
+      <p>
+        <strong>Compute requirements.</strong> The 4-stage post-training pipeline is computationally expensive. Training the GRPO stage for the 235B model likely requires thousands of GPU-hours on H100s. This limits reproducibility for most research groups.
+      </p>
+
+      <p>
+        <strong>Distillation quality ceiling.</strong> While strong-to-weak distillation is efficient, it introduces a quality ceiling: the student can never exceed the teacher's capability. The distilled 4B model inherits the teacher's reasoning patterns but cannot discover novel strategies.
+      </p>
+
+      <p>
+        <strong>Mode switching reliability.</strong> The thinking/non-thinking mode switching is controlled by system prompts, which can be overridden by user inputs. Adversarial users may force thinking mode in latency-sensitive deployments or disable it in reasoning-critical applications.
+      </p>
+
+      <p>
+        <strong>Verifiable reward limitation.</strong> GRPO requires verifiable rewards for reasoning tasks. For open-ended tasks (creative writing, subjective analysis), the reward design is less straightforward and relies on LLM judges, which introduce their own biases.
+      </p>
+
+      <p>
+        <strong>Multilingual evaluation gaps.</strong> While pretrained on 119 languages, the evaluation focuses primarily on English, Chinese, and a few major languages. Performance on low-resource languages may degrade significantly.
+      </p>
+
+      <!-- Section 12: Practical Implications -->
+      <h2 class="title">12. Practical Implications</h2>
+
+      <h3 class="subtitle">12.1 For Alignment Pipelines</h3>
+
+      <p>
+        <strong>Adopt the 4-stage pipeline.</strong> The Long-CoT cold start → Reasoning RL → Thinking fusion → General RL pipeline is the current best practice for building models with both reasoning and general capabilities. Each stage is essential and builds on the previous one.
+      </p>
+
+      <p>
+        <strong>Use GRPO for verifiable tasks.</strong> For math, code, and logic, GRPO (from <a href="14-deepseekmath.html">Paper 14</a>) is more effective than DPO (from <a href="10-dpo.html">Paper 10</a>). Reserve DPO for tasks without verifiable rewards.
+      </p>
+
+      <p>
+        <strong>Invest in distillation.</strong> For teams without massive compute budgets, strong-to-weak distillation from a large model provides a practical path to capable small models. The 10× efficiency advantage is substantial.
+      </p>
+
+      <h3 class="subtitle">12.2 For Deployment</h3>
+
+      <p>
+        <strong>Offer both modes.</strong> Thinking mode for complex tasks, non-thinking mode for simple tasks. This dual-mode capability is a significant UX advantage over single-mode models.
+      </p>
+
+      <p>
+        <strong>Set thinking budgets.</strong> For production deployments, set explicit thinking token budgets to prevent runaway reasoning chains from consuming excessive compute.
+      </p>
+
+      <h3 class="subtitle">12.3 Cross-References to Other Papers</h3>
+
+      <ul>
+        <li><a href="14-deepseekmath.html">Paper 14</a> provides the GRPO algorithm that Qwen3 uses across stages 2 and 4</li>
+        <li><a href="16-phi-3.html">Paper 16</a>'s Phi-3 demonstrates the MoE architecture that Qwen3 extends to 235B scale</li>
+        <li><a href="10-dpo.html">Paper 10</a>'s DPO is used for tasks without verifiable rewards in Stage 4</li>
+        <li><a href="06-lora.html">Paper 06</a>'s LoRA enables efficient fine-tuning of Qwen3 for specific domains</li>
+        <li><a href="18-unsloth-dpo-guide.html">Paper 18</a> provides practical implementation guidance for DPO/GRPO training</li>
+        <li><a href="15-sft-grpo-overlap.html">Paper 15</a>'s finding on SFT/GRPO data overlap is relevant to Qwen3's pipeline design</li>
+      </ul>
+
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

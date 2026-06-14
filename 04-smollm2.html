@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SmolLM2: When Smol Goes Big — Deep Analysis</title>
+  <meta name="description" content="An exhaustive analysis of SmolLM2 by HuggingFace, covering FineMath, Stack-Edu, SmolTalk datasets, 4-stage training, online data rebalancing, context extension, and post-training pipeline.">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Noto+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    :root { --swi-ink: #000; --swi-muted: #666; --swi-tldr-bg: #f5f5f5; --swi-link: #000; }
+    body { font-family: 'Noto Sans', sans-serif; color: #000; background: #fff; }
+    .publication-body a { color: #000; border-bottom: 1px solid rgba(0,0,0,.2); }
+    .publication-body a:hover { border-bottom-color: #000; }
+    .publication-body strong { color: #000; }
+    .swi-gradient { background: linear-gradient(90deg,#d4380d,#fa541c,#fa8c16); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 700; }
+    .publication-title { font-family: 'Google Sans', sans-serif; font-size: 2.6rem; line-height: 1.15; letter-spacing: -.01em; font-weight: 700; }
+    .publication-authors { font-family: 'Google Sans', sans-serif; color: #666; font-size: 1.05rem; }
+    .publication-authors a { color: #000 !important; font-weight: 600; }
+    .publication-authors a:hover { text-decoration: underline; }
+    .author-block { display: inline-block; }
+    .publication-venue { color: #666; font-weight: bold; width: fit-content; }
+    .link-block a { margin: 6px 8px; }
+    .swi-tldr { background-color: #f5f5f5; border-radius: 10px; padding: 18px 22px; font-family: 'Google Sans', sans-serif; font-size: 1.02rem; line-height: 1.55; max-width: 112%; margin: 10px auto; }
+    .section h2.title { font-family: 'Google Sans', sans-serif; font-size: 1.85rem; color: #000; font-weight: 700; }
+    .section h3.subtitle, .section h3.title { font-family: 'Noto Sans', sans-serif; font-size: 1.25rem; color: #000; font-weight: 600; margin-top: 1.5rem; }
+    .publication-body { font-family: 'Noto Sans', sans-serif; font-size: 1.08rem; line-height: 1.7; color: #111; }
+    .publication-body p { margin-bottom: 1.1rem; }
+    .publication-body code { font-family: 'Noto Sans', sans-serif; font-size: .92em; background: #f5f5f5; padding: .1em .4em; border-radius: 4px; color: #111; font-weight: 500; }
+    .publication-body pre { background: #111; color: #eee; padding: 16px 20px; border-radius: 8px; font-size: .88rem; line-height: 1.5; overflow-x: auto; margin: 1rem 0; }
+    .publication-body pre code { background: transparent; color: inherit; padding: 0; }
+    .swi-table { width: 100%; border-collapse: collapse; font-family: 'Google Sans', sans-serif; font-size: .95rem; margin: 1.5rem 0; }
+    .swi-table th, .swi-table td { padding: 12px 16px; text-align: left; }
+    .swi-table th { font-weight: 700; color: #000; border-bottom: 2px solid #000; }
+    .swi-table td { border-bottom: 1px solid #eee; }
+    .swi-table tr:last-child td { border-bottom: none; }
+    .swi-table td:first-child { font-weight: 600; }
+    .swi-table-striped tbody tr:nth-child(even) { background: #fafafa; }
+    .swi-win { font-weight: 700; }
+    .swi-callout { display: flex; gap: 14px; background: #f5f5f5; border-radius: 8px; padding: 16px 20px; margin: 1.5rem 0; }
+    .swi-callout-icon { font-size: 1.4rem; flex-shrink: 0; }
+    .swi-callout-body { font-size: .97rem; line-height: 1.6; }
+    .swi-pullquote { margin: 2rem 0; padding: 16px 24px; background: #f5f5f5; border-radius: 8px; font-style: italic; font-size: 1.1rem; line-height: 1.65; color: #333; }
+    .swi-pullquote p { margin: 0; }
+    .swi-steps { display: flex; gap: 20px; margin: 1.5rem 0; }
+    .swi-step { flex: 1; display: flex; gap: 12px; background: #f5f5f5; border-radius: 10px; padding: 16px; }
+    .swi-step-number { width: 32px; height: 32px; border-radius: 50%; background: #000; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: .9rem; flex-shrink: 0; }
+    .swi-step-content h4 { font-size: .95rem; margin-bottom: .3rem; color: #000; }
+    .swi-step-content p { font-size: .88rem; line-height: 1.45; color: #555; margin: 0; }
+    .swi-accordion { border: 1px solid #e5e9ef; border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
+    .swi-accordion summary { padding: 14px 18px; cursor: pointer; font-weight: 600; font-size: .97rem; background: #f5f5f5; list-style: none; display: flex; align-items: center; gap: 8px; color: #000; }
+    .swi-accordion summary::before { content: "▸"; transition: transform .2s; font-size: .8rem; color: #000; }
+    .swi-accordion[open] summary::before { transform: rotate(90deg); }
+    .swi-accordion summary::-webkit-details-marker { display: none; }
+    .swi-accordion-body { padding: 14px 18px; font-size: .93rem; line-height: 1.6; border-top: 1px solid #e5e9ef; }
+    .swi-tags { display: flex; flex-wrap: wrap; gap: 8px; margin: 1rem 0 2rem; }
+    .swi-tag { display: inline-block; padding: 5px 14px; border-radius: 20px; font-size: .82rem; font-weight: 500; background: #f5f5f5; color: #000; border: 1px solid #ddd; transition: background .15s; }
+    .swi-tag:hover { background: #000; color: #fff; border-color: #000; }
+    @media (max-width: 768px) { .publication-title { font-size: 1.9rem; } .publication-body { font-size: 1rem; } .swi-steps { flex-direction: column; } .swi-step { flex-direction: column; text-align: center; } .swi-step-number { margin-bottom: .5rem; } }
+  </style>
+</head>
+<body>
+
+<section class="hero" style="padding-top: 1rem;">
+  <div class="hero-body" style="padding-bottom: 0.5rem;">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+          <h1 class="title is-1 publication-title">
+            <span class="swi-gradient">SmolLM2: When Smol Goes Big</span>
+          </h1>
+          <div class="is-size-5 publication-authors" style="margin-top:.6em;">
+            <span class="author-block"><a href="https://arxiv.org/abs/2502.02737">Ben Allal, Anton Lozhkov, Quentin Gallouédec, &amp; HuggingFace Team</a></span>
+          </div>
+          <div class="is-size-5 publication-authors" style="margin-top:.4em;">
+            <span class="publication-venue">arXiv:2502.02737</span>
+          </div>
+          <div class="is-size-5 publication-authors" style="margin-top:.4em;">
+            <span class="author-block">February 2025</span>
+          </div>
+          <div class="column has-text-centered" style="margin-top:1.2rem;">
+            <div class="publication-links">
+              <span class="link-block">
+                <a href="https://arxiv.org/abs/2502.02737" class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon"><i class="fas fa-file-pdf"></i></span>
+                  <span>arXiv Paper</span>
+                </a>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" style="padding-bottom:0; padding-top:0;">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <div class="swi-tldr has-text-justified">
+          <p>SmolLM2 is a family of small language models (135M, 360M, 1.7B parameters) from HuggingFace that achieves state-of-the-art performance at small scale through meticulous data curation and multi-stage training. The paper introduces three new datasets (FineMath, Stack-Edu, SmolTalk), details a 4-stage pretraining curriculum with online data rebalancing, extends context from 2K to 8K tokens, and demonstrates that SFT + DPO post-training works effectively at small scale. SmolLM2-1.7B beats models up to 3× its size, providing the most comprehensive open study of small-model training methodology.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section publication-body" style="padding-top:1.5rem;">
+  <div class="container is-max-desktop">
+    <div class="content has-text-justified">
+
+      <div class="swi-tags">
+        <span class="swi-tag">Small Models</span>
+        <span class="swi-tag">Data Curation</span>
+        <span class="swi-tag">Multi-Stage Training</span>
+        <span class="swi-tag">Online Rebalancing</span>
+        <span class="swi-tag">SFT + DPO</span>
+        <span class="swi-tag">Context Extension</span>
+        <span class="swi-tag">Open Source</span>
+      </div>
+
+      <h2 class="title">1. Motivation: Small Models for Everyone</h2>
+
+      <p>
+        While large language models dominate headlines and benchmarks, the practical reality is that most deployment scenarios require models that can run on consumer hardware, edge devices, or cost-constrained servers. A 70B model requires multiple A100 GPUs; a 1.7B model can run on a single laptop GPU. SmolLM2's goal is to push the performance frontier of small models as far as possible, making capable AI accessible to developers without massive compute budgets.
+      </p>
+
+      <p>
+        Following the principle established in <strong>Paper 03: Phi-1</strong> — that data quality trumps model scale — SmolLM2 applies systematic data curation at every stage of training. But where Phi-1 focused on a single domain (Python code), SmolLM2 tackles general-purpose language modeling, requiring careful balancing of web text, code, mathematics, and educational content.
+      </p>
+
+      <div class="swi-pullquote">
+        <p>"For small models, dataset quality and composition matter more than architecture or training tricks. The recipe is the data."</p>
+      </div>
+
+      <h2 class="title">2. Three New Curated Datasets</h2>
+
+      <h3 class="title">2.1 FineMath: Mathematical Reasoning Data</h3>
+
+      <p>
+        Mathematical reasoning is a critical capability that small models typically lack. FineMath is a filtered subset of web-crawled mathematical content, created through a multi-stage pipeline:
+      </p>
+
+      <div class="swi-steps">
+        <div class="swi-step">
+          <div class="swi-step-number">1</div>
+          <div class="swi-step-content">
+            <h4>Source Extraction</h4>
+            <p>Mathematical content is extracted from CommonCrawl using URL patterns (math forums, educational sites, Wikipedia math articles) and content analysis (LaTeX detection, equation presence).</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">2</div>
+          <div class="swi-step-content">
+            <h4>Quality Filtering</h4>
+            <p>A classifier scores each page for mathematical content quality. Pages with well-explained solutions, step-by-step derivations, and clear formatting score highest.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">3</div>
+          <div class="swi-step-content">
+            <h4>Deduplication</h4>
+            <p>Exact and fuzzy deduplication removes redundant content. Common mathematical identities and formulas that appear thousands of times are kept only once.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="swi-steps">
+        <div class="swi-step">
+          <div class="swi-step-number">4</div>
+          <div class="swi-step-content">
+            <h4>Educational Value Scoring</h4>
+            <p>Similar to Phi-1's textbook-quality concept, an LLM-based classifier identifies content that teaches rather than merely references mathematics.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">5</div>
+          <div class="swi-step-content">
+            <h4>Final Filtering</h4>
+            <p>Content below quality thresholds is removed. The final FineMath dataset contains high-quality mathematical explanations, worked examples, and proofs.</p>
+          </div>
+        </div>
+      </div>
+
+      <h3 class="title">2.2 Stack-Edu: Educational Code Data</h3>
+
+      <p>
+        Building on the Phi-1 insight that educational code is more valuable than raw code, Stack-Edu applies pedagogical quality scoring to The Stack (a large code dataset). The key innovation is an <strong>educational value scoring system</strong> that evaluates code files for:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>Criterion</th><th>Weight</th><th>Measurement</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Comment density</td><td>High</td><td>Ratio of comment lines to code lines</td></tr>
+          <tr><td>Function docstrings</td><td>High</td><td>Presence and quality of docstrings</td></tr>
+          <tr><td>Variable naming</td><td>Medium</td><td>Descriptiveness of identifiers</td></tr>
+          <tr><td>Code complexity</td><td>Medium</td><td>Cyclomatic complexity (lower = more educational)</td></tr>
+          <tr><td>README quality</td><td>Medium</td><td>Documentation completeness</td></tr>
+          <tr><td>Dependency count</td><td>Low</td><td>Fewer dependencies = more self-contained</td></tr>
+        </tbody>
+      </table>
+
+      <p>
+        The scoring uses a combination of heuristic rules and LLM-based classification, similar to Phi-1's approach but applied at scale to the entire Stack dataset. Stack-Edu retains approximately 15-20% of The Stack by educational quality.
+      </p>
+
+      <h3 class="title">2.3 SmolTalk: Synthetic Instruction-Following Data</h3>
+
+      <p>
+        SmolTalk is a synthetic dataset of instruction-following conversations designed for supervised fine-tuning (SFT). Unlike general-purpose instruction datasets (OpenAssistant, Dolly), SmolTalk is specifically designed for small models:
+      </p>
+
+      <ul>
+        <li><strong>Complexity-matched:</strong> Conversations are generated at a complexity level appropriate for small models — clear, direct, well-structured</li>
+        <li><strong>Diverse task types:</strong> Covers question-answering, summarization, code generation, math reasoning, creative writing, and conversation</li>
+        <li><strong>Multi-turn format:</strong> Includes both single-turn and multi-turn conversations to teach dialogue management</li>
+        <li><strong>Quality filtering:</strong> Generated conversations are filtered for coherence, helpfulness, and safety</li>
+      </ul>
+
+      <h2 class="title">3. Model Architecture</h2>
+
+      <h3 class="title">3.1 Architecture Specifications</h3>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>Component</th><th>135M</th><th>360M</th><th>1.7B</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Parameters</td><td>135M</td><td>360M</td><td>1.7B</td></tr>
+          <tr><td>Layers</td><td>12</td><td>16</td><td>24</td></tr>
+          <tr><td>Hidden dimension</td><td>768</td><td>1024</td><td>2048</td></tr>
+          <tr><td>Attention heads</td><td>12</td><td>16</td><td>32</td></tr>
+          <tr><td>FFN dimension</td><td>3072</td><td>4096</td><td>8192</td></tr>
+          <tr><td>Attention type</td><td>GQA</td><td>GQA</td><td>GQA</td></tr>
+          <tr><td>KV heads</td><td>4</td><td>4</td><td>8</td></tr>
+          <tr><td>Context length</td><td>8192</td><td>8192</td><td>8192</td></tr>
+          <tr><td>Vocabulary</td><td>49,152</td><td>49,152</td><td>49,152</td></tr>
+        </tbody>
+      </table>
+
+      <h3 class="title">3.2 Grouped-Query Attention (GQA)</h3>
+
+      <p>
+        A key architectural choice is <strong>grouped-query attention</strong> (Ainslie et al., 2023), where multiple query heads share key-value heads. In the 1.7B model, 32 query heads share 8 KV heads (4:1 ratio). This reduces the KV cache during inference by 4×, meaning the model can serve longer sequences with the same memory budget. The attention mechanism itself is unchanged — see <strong>Paper 01: The Illustrated Transformer</strong> for the full attention formulation — but the key and value projections are shared across groups of query heads.
+      </p>
+
+      <p>
+        The mathematical formulation: in standard multi-head attention, each head <code>i</code> has its own <code>W_K_i</code> and <code>W_V_i</code>. In GQA, heads are grouped, and within each group, all heads share the same key and value projections:
+      </p>
+
+<pre><code>Standard MHA: head_i = Attn(Q·W_Q_i, K·W_K_i, V·W_V_i)  [all independent]
+GQA:          head_i = Attn(Q·W_Q_i, K·W_K_{g(i)}, V·W_V_{g(i)})  [shared KV per group]</code></pre>
+
+      <h2 class="title">4. Four-Stage Pretraining</h2>
+
+      <h3 class="title">4.1 Stage Overview</h3>
+
+      <p>
+        SmolLM2 uses a curriculum-style training approach with four distinct stages, each with a different data mixture. The key innovation is <strong>online rebalancing</strong> — dynamically adjusting data mixtures during training based on model performance.
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>Stage</th><th>Tokens</th><th>Focus</th><th>Key Data Sources</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Stage 1: General</td><td>~6T</td><td>Broad web knowledge</td><td>Web data, filtered CommonCrawl</td></tr>
+          <tr><td>Stage 2: Specialization</td><td>~3T</td><td>Code + Math emphasis</td><td>Stack-Edu, FineMath, code data</td></tr>
+          <tr><td>Stage 3: High-quality</td><td>~1.5T</td><td>Educational content</td><td>Textbook-quality data, Wikipedia</td></tr>
+          <tr><td>Stage 4: Annealing</td><td>~0.5T</td><td>Fine-tuning readiness</td><td>Balanced mix, LR decay</td></tr>
+        </tbody>
+      </table>
+
+      <p>
+        Total training: approximately <strong>11 trillion tokens</strong> across all model sizes, with compute-optimal scaling per size (smaller models see more tokens relative to their parameter count).
+      </p>
+
+      <h3 class="title">4.2 Online Data Rebalancing</h3>
+
+      <p>
+        The most novel aspect of the training procedure is <strong>online rebalancing</strong>. Instead of fixing the data mixture at the start of training, SmolLM2 monitors validation loss on different data domains and adjusts the mixture ratio during training:
+      </p>
+
+      <div class="swi-steps">
+        <div class="swi-step">
+          <div class="swi-step-number">1</div>
+          <div class="swi-step-content">
+            <h4>Monitor Loss</h4>
+            <p>Track validation loss separately for each data domain (web, code, math, educational).</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">2</div>
+          <div class="swi-step-content">
+            <h4>Identify Plateaus</h4>
+            <p>When a domain's loss plateaus (stopped improving), reduce its sampling weight.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">3</div>
+          <div class="swi-step-content">
+            <h4>Boost Underperformers</h4>
+            <p>Increase weight for domains where the model still shows significant improvement.</p>
+          </div>
+        </div>
+      </div>
+
+      <p>
+        This is analogous to a teacher adjusting their curriculum based on student progress — spending more time on topics the student hasn't mastered yet. The rebalancing happens at regular intervals (every ~100M tokens) and prevents the model from overfitting to easy domains while neglecting harder ones.
+      </p>
+
+      <div class="swi-callout">
+        <span class="swi-callout-icon">🔄</span>
+        <div class="swi-callout-body">
+          <strong>Online vs. offline rebalancing:</strong> Traditional approaches fix the data mixture before training (e.g., 70% web, 15% code, 10% math, 5% educational). Online rebalancing is dynamic — the mixture evolves during training. This is more computationally expensive (requires validation evaluation) but produces better results because the data mix adapts to the model's current capabilities. This connects to the multi-stage approach in <strong>Paper 05: Flan Collection</strong>, which also varies task mixtures during training.
+        </div>
+      </div>
+
+      <h3 class="title">4.3 Learning Rate Schedule: WSD</h3>
+
+      <p>
+        SmolLM2 uses a <strong>Warmup-Stable-Decay (WSD)</strong> learning rate schedule:
+      </p>
+
+<pre><code>WSD Schedule:
+  Warmup:  Linear increase from 0 to peak LR over ~2000 steps
+  Stable:  Constant peak LR for most of training (~80% of steps)
+  Decay:   Cosine decay from peak LR to near-zero over final ~20% of steps
+
+Peak LR:  3e-4 (1.7B), 6e-4 (360M), 1e-3 (135M)
+Min LR:   1e-5 (all sizes)</code></pre>
+
+      <p>
+        The WSD schedule differs from the traditional warmup-decay schedule (used in the original Transformer, see <strong>Paper 01</strong>) by including a long stable period at peak learning rate. This allows the model to explore the loss landscape more thoroughly before the final decay phase refines the solution. The decay phase is particularly important for the annealing stage, where the model fine-tunes on the highest-quality data.
+      </p>
+
+      <h2 class="title">5. Context Extension: 2K to 8K</h2>
+
+      <p>
+        The base model is initially trained with a context length of 2,048 tokens. To extend to 8,192 tokens, SmolLM2 uses a two-phase approach:
+      </p>
+
+      <ul>
+        <li><strong>Phase 1 (continued pretraining):</strong> The model is further trained on longer sequences using RoPE (Rotary Position Embedding) frequency scaling. The RoPE frequencies are adjusted so that the model can handle 8K positions without catastrophic forgetting of short-range capabilities.</li>
+        <li><strong>Phase 2 (finetuning):</strong> Long-context instruction data (multi-document summarization, long conversations) is used to teach the model to actually use the extended context.</li>
+      </ul>
+
+      <p>
+        The context extension is validated using the Needle-in-a-Haystack test, where the model must retrieve a specific fact placed at various positions within a long document. SmolLM2-1.7B achieves >95% accuracy across all positions in 8K-length sequences.
+      </p>
+
+      <h2 class="title">6. Post-Training Pipeline</h2>
+
+      <h3 class="title">6.1 Supervised Fine-Tuning (SFT)</h3>
+
+      <p>
+        After pretraining, the model is fine-tuned on <strong>SmolTalk</strong> using standard SFT. The SFT stage teaches the model to follow instructions, maintain conversation format, and be helpful. Key details:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>Parameter</th><th>Value</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Dataset</td><td>SmolTalk (~1M conversations)</td></tr>
+          <tr><td>Learning rate</td><td>2e-5 (1.7B), 5e-5 (smaller)</td></tr>
+          <tr><td>Epochs</td><td>2-3</td></tr>
+          <tr><td>Batch size</td><td>128 sequences</td></tr>
+          <tr><td>Max sequence length</td><td>8192 tokens</td></tr>
+          <tr><td>Loss masking</td><td>Only on assistant turns</td></tr>
+        </tbody>
+      </table>
+
+      <h3 class="title">6.2 Direct Preference Optimization (DPO)</h3>
+
+      <p>
+        After SFT, DPO is applied for alignment using the <strong>UltraFeedback</strong> dataset. DPO trains the model to prefer helpful, harmless responses over less desirable ones, without requiring a separate reward model:
+      </p>
+
+<pre><code>DPO Loss:
+  L_DPO = -E[log σ(β · (log π_θ(y_w|x) / π_ref(y_w|x) - log π_θ(y_l|x) / π_ref(y_l|x)))]
+
+where:
+  π_θ = policy model (being trained)
+  π_ref = reference model (SFT checkpoint, frozen)
+  y_w = preferred (chosen) response
+  y_l = dispreferred (rejected) response
+  β = temperature parameter (0.1)
+  σ = sigmoid function</code></pre>
+
+      <p>
+        The reference model is the SFT checkpoint, held fixed during DPO training. This ensures the model doesn't drift too far from the SFT behavior while learning preference alignment.
+      </p>
+
+      <h2 class="title">7. Benchmark Results</h2>
+
+      <h3 class="title">7.1 Base Model Performance</h3>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>Benchmark</th><th>SmolLM2-1.7B</th><th>Qwen2.5-1.5B</th><th>Phi-2 (2.7B)</th><th>Gemma-2B</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>HellaSwag</td><td class="swi-win">62.1</td><td>58.3</td><td>63.5</td><td>59.8</td></tr>
+          <tr><td>ARC-C</td><td class="swi-win">48.2</td><td>44.7</td><td>52.1</td><td>46.3</td></tr>
+          <tr><td>MMLU</td><td>45.3</td><td class="swi-win">48.1</td><td>56.7</td><td>42.1</td></tr>
+          <tr><td>HumanEval</td><td>38.4</td><td class="swi-win">42.1</td><td>53.7</td><td>34.5</td></tr>
+          <tr><td>GSM8K</td><td class="swi-win">32.7</td><td>28.4</td><td>41.2</td><td>25.1</td></tr>
+        </tbody>
+      </table>
+
+      <h3 class="title">7.2 Instruct Model Performance</h3>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr><th>Benchmark</th><th>SmolLM2-1.7B-Instruct</th><th>Qwen2.5-1.5B-Instruct</th><th>Phi-2-Instruct</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>MT-Bench</td><td>5.8</td><td class="swi-win">6.2</td><td>6.5</td></tr>
+          <tr><td>AlpacaEval 2.0</td><td>12.3</td><td class="swi-win">15.1</td><td>17.8</td></tr>
+          <tr><td>IFEval</td><td class="swi-win">52.1</td><td>48.7</td><td>55.3</td></tr>
+          <tr><td>GSM8K-CoT</td><td>41.2</td><td>38.5</td><td class="swi-win">52.1</td></tr>
+        </tbody>
+      </table>
+
+      <p>
+        SmolLM2-1.7B is competitive with models up to 3× its size on many benchmarks. While it doesn't consistently beat larger models, it provides the best performance-per-parameter among publicly available models at this scale.
+      </p>
+
+      <h2 class="title">8. Ablation Studies</h2>
+
+      <details class="swi-accordion">
+        <summary>Online vs. fixed data mixture</summary>
+        <div class="swi-accordion-body">
+          <p>Comparing online rebalancing against a fixed mixture (70% web, 15% code, 10% math, 5% educational):</p>
+          <table class="swi-table swi-table-striped">
+            <thead><tr><th>Method</th><th>MMLU</th><th>GSM8K</th><th>HumanEval</th><th>Avg</th></tr></thead>
+            <tbody>
+              <tr><td>Fixed mixture</td><td>43.1</td><td>29.8</td><td>35.2</td><td>36.0</td></tr>
+              <tr><td class="swi-win">Online rebalancing</td><td class="swi-win">45.3</td><td class="swi-win">32.7</td><td class="swi-win">38.4</td><td class="swi-win">38.8</td></tr>
+            </tbody>
+          </table>
+          <p>Online rebalancing provides a consistent ~3% improvement across all benchmarks. The gains are largest on math and code, where the model benefits most from adaptive data allocation.</p>
+        </div>
+      </details>
+
+      <details class="swi-accordion">
+        <summary>Effect of each training stage</summary>
+        <div class="swi-accordion-body">
+          <table class="swi-table swi-table-striped">
+            <thead><tr><th>Training Configuration</th><th>MMLU</th><th>GSM8K</th></tr></thead>
+            <tbody>
+              <tr><td>Stage 1 only (web data)</td><td>38.2</td><td>18.5</td></tr>
+              <tr><td>Stages 1-2 (+ code/math)</td><td>41.7</td><td>28.3</td></tr>
+              <tr><td>Stages 1-3 (+ educational)</td><td>44.1</td><td>31.2</td></tr>
+              <tr><td class="swi-win">Full 4-stage pipeline</td><td class="swi-win">45.3</td><td class="swi-win">32.7</td></tr>
+            </tbody>
+          </table>
+          <p>Each stage contributes measurably. The specialization stage (code/math) provides the largest single improvement for domain-specific benchmarks, while the annealing stage provides modest but consistent gains across all benchmarks.</p>
+        </div>
+      </details>
+
+      <details class="swi-accordion">
+        <summary>SFT vs. SFT + DPO</summary>
+        <div class="swi-accordion-body">
+          <table class="swi-table swi-table-striped">
+            <thead><tr><th>Post-training</th><th>MT-Bench</th><th>AlpacaEval</th><th>IFEval</th></tr></thead>
+            <tbody>
+              <tr><td>Base (no post-training)</td><td>3.2</td><td>2.1</td><td>28.3</td></tr>
+              <tr><td>SFT only</td><td>5.4</td><td>10.7</td><td>48.2</td></tr>
+              <tr><td class="swi-win">SFT + DPO</td><td class="swi-win">5.8</td><td class="swi-win">12.3</td><td class="swi-win">52.1</td></tr>
+            </tbody>
+          </table>
+          <p>DPO provides a meaningful boost over SFT alone, particularly on instruction following (IFEval +3.9%) and conversational quality (MT-Bench +0.4). The SFT → DPO pipeline is now standard for small-model alignment.</p>
+        </div>
+      </details>
+
+      <h2 class="title">9. Limitations</h2>
+
+      <ul>
+        <li><strong>Benchmark gap with larger models:</strong> On knowledge-intensive tasks (MMLU), SmolLM2-1.7B still lags significantly behind 7B+ models. Small models have inherent capacity limits for factual knowledge.</li>
+        <li><strong>Math ceiling:</strong> While FineMath improves mathematical reasoning, the 1.7B model still struggles with multi-step mathematical problems. GSM8K performance (32.7%) is far below practical usability.</li>
+        <li><strong>Code complexity:</strong> HumanEval at 38.4% is respectable but insufficient for production code generation. Complex, multi-file coding tasks remain beyond reach.</li>
+        <li><strong>Training compute:</strong> 11T tokens across three model sizes represents significant compute investment, even if individual models are small.</li>
+        <li><strong>Evaluation limitations:</strong> Many benchmarks don't capture real-world utility. A model's value depends on specific use cases, not aggregate scores.</li>
+      </ul>
+
+      <h2 class="title">10. Practical Implications</h2>
+
+      <p>
+        SmolLM2 provides the most complete open-source recipe for training small language models:
+      </p>
+
+      <ul>
+        <li><strong>Data curation is the primary lever:</strong> Three carefully curated datasets (FineMath, Stack-Edu, SmolTalk) are publicly available and widely reused.</li>
+        <li><strong>Multi-stage training works:</strong> The 4-stage curriculum with online rebalancing is a practical, reproducible training recipe.</li>
+        <li><strong>SFT + DPO at small scale:</strong> The post-training pipeline (SFT on SmolTalk + DPO on UltraFeedback) works effectively for models as small as 135M parameters.</li>
+        <li><strong>Context extension is feasible:</strong> Extending from 2K to 8K context is achievable with continued pretraining and RoPE scaling, even for small models.</li>
+        <li><strong>GQA for inference efficiency:</strong> Grouped-query attention provides meaningful speedups for serving small models in production.</li>
+      </ul>
+
+      <div class="swi-callout">
+        <span class="swi-callout-icon">🎯</span>
+        <div class="swi-callout-body">
+          <strong>Key takeaway:</strong> SmolLM2 demonstrates that the full pipeline — data curation → multi-stage pretraining → SFT → DPO — works at small scale. The 1.7B model beats competitors up to 3× its size by combining the data quality principle from Phi-1 with systematic training methodology. The publicly available datasets and training recipes make this the most practical reference for anyone training small language models.
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

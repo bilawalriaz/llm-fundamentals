@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SFT-GRPO Data Overlap as a Post-Training Hyperparameter</title>
+  <meta name="description" content="Exhaustive analysis of how data overlap between SFT and GRPO stages affects alignment performance, including the reward saturation hypothesis and dual-metric evaluation.">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Noto+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    :root { --swi-ink:#000000; --swi-muted:#666; --swi-tldr-bg:#f5f5f5; --swi-link:#000; }
+    body { font-family:'Noto Sans',sans-serif; color:#000; background:#fff; }
+    .publication-body a { color:#000; border-bottom:1px solid rgba(0,0,0,.2); }
+    .publication-body a:hover { border-bottom-color:#000; }
+    .publication-body strong { color:#000; }
+    .swi-gradient { background:linear-gradient(90deg,#d4380d,#fa541c,#fa8c16); -webkit-background-clip:text; -webkit-text-fill-color:transparent; font-weight:700; }
+    .publication-title { font-family:'Google Sans',sans-serif; font-size:2.6rem; line-height:1.15; letter-spacing:-.01em; font-weight:700; }
+    .publication-authors { font-family:'Google Sans',sans-serif; color:#666; font-size:1.05rem; }
+    .publication-authors a { color:#000!important; font-weight:600; }
+    .publication-authors a:hover { text-decoration:underline; }
+    .author-block { display:inline-block; }
+    .publication-venue { color:#666; font-weight:700; width:fit-content; }
+    .link-block a { margin:6px 8px; }
+    .swi-tldr { background-color:#f5f5f5; border-radius:10px; padding:18px 22px; font-family:'Google Sans',sans-serif; font-size:1.02rem; line-height:1.55; max-width:112%; margin:10px auto; }
+    .section h2.title { font-family:'Google Sans',sans-serif; font-size:1.85rem; color:#000; font-weight:700; }
+    .section h3.subtitle,.section h3.title { font-family:'Noto Sans',sans-serif; font-size:1.25rem; color:#000; font-weight:600; margin-top:1.5rem; }
+    .publication-body { font-family:'Noto Sans',sans-serif; font-size:1.08rem; line-height:1.7; color:#111; }
+    .publication-body p { margin-bottom:1.1rem; }
+    .publication-body code { font-family:'Noto Sans',sans-serif; font-size:.92em; background:#f5f5f5; padding:.1em .4em; border-radius:4px; color:#111; font-weight:500; }
+    .publication-body pre { background:#111; color:#eee; padding:16px 20px; border-radius:8px; font-size:.88rem; line-height:1.5; overflow-x:auto; margin:1rem 0; }
+    .publication-body pre code { background:transparent; color:inherit; padding:0; }
+    .swi-table { width:100%; border-collapse:collapse; font-family:'Google Sans',sans-serif; font-size:.95rem; margin:1.5rem 0; }
+    .swi-table th,.swi-table td { padding:12px 16px; text-align:left; }
+    .swi-table th { font-weight:700; color:#000; border-bottom:2px solid #000; }
+    .swi-table td { border-bottom:1px solid #eee; }
+    .swi-table tr:last-child td { border-bottom:none; }
+    .swi-table td:first-child { font-weight:600; }
+    .swi-table-striped tbody tr:nth-child(even) { background:#fafafa; }
+    .swi-win { font-weight:700; }
+    .swi-callout { display:flex; gap:14px; background:#f5f5f5; border-radius:8px; padding:16px 20px; margin:1.5rem 0; }
+    .swi-callout-icon { font-size:1.4rem; flex-shrink:0; }
+    .swi-callout-body { font-size:.97rem; line-height:1.6; }
+    .swi-pullquote { margin:2rem 0; padding:16px 24px; background:#f5f5f5; border-radius:8px; font-style:italic; font-size:1.1rem; line-height:1.65; color:#333; }
+    .swi-pullquote p { margin:0; }
+    .swi-steps { display:flex; gap:20px; margin:1.5rem 0; }
+    .swi-step { flex:1; display:flex; gap:12px; background:#f5f5f5; border-radius:10px; padding:16px; }
+    .swi-step-number { width:32px; height:32px; border-radius:50%; background:#000; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.9rem; flex-shrink:0; }
+    .swi-step-content h4 { font-size:.95rem; margin-bottom:.3rem; color:#000; }
+    .swi-step-content p { font-size:.88rem; line-height:1.45; color:#555; margin:0; }
+    .swi-accordion { border:1px solid #e5e9ef; border-radius:8px; margin-bottom:8px; overflow:hidden; }
+    .swi-accordion summary { padding:14px 18px; cursor:pointer; font-weight:600; font-size:.97rem; background:#f5f5f5; list-style:none; display:flex; align-items:center; gap:8px; color:#000; }
+    .swi-accordion summary::before { content:"▸"; transition:transform .2s; font-size:.8rem; color:#000; }
+    .swi-accordion[open] summary::before { transform:rotate(90deg); }
+    .swi-accordion summary::-webkit-details-marker { display:none; }
+    .swi-accordion-body { padding:14px 18px; font-size:.93rem; line-height:1.6; border-top:1px solid #e5e9ef; }
+    .swi-tags { display:flex; flex-wrap:wrap; gap:8px; margin:1rem 0 2rem; }
+    .swi-tag { display:inline-block; padding:5px 14px; border-radius:20px; font-size:.82rem; font-weight:500; background:#f5f5f5; color:#000; border:1px solid #ddd; transition:background .15s; }
+    .swi-tag:hover { background:#000; color:#fff; border-color:#000; }
+    @media(max-width:768px){.publication-title{font-size:1.9rem;}.publication-body{font-size:1rem;}.swi-steps{flex-direction:column;}.swi-step{flex-direction:column;text-align:center;}.swi-step-number{margin-bottom:.5rem;}}
+  </style>
+</head>
+<body>
+
+<!-- HERO -->
+<section class="hero" style="padding-top:1rem;">
+  <div class="hero-body" style="padding-bottom:.5rem;">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+          <h1 class="title is-1 publication-title">
+            <span class="swi-gradient">SFT-GRPO Data Overlap as a Post-Training Hyperparameter</span>
+          </h1>
+          <div class="is-size-5 publication-authors" style="margin-top:.6em;">
+            <span class="author-block"><a href="https://arxiv.org/abs/2604.13515">Anonymous Authors</a></span>
+          </div>
+          <div class="is-size-5 publication-authors" style="margin-top:.4em;">
+            <span class="publication-venue">arXiv:2604.13515</span>
+          </div>
+          <div class="is-size-5 publication-authors" style="margin-top:.4em;">
+            <span class="author-block">April 2026</span>
+          </div>
+          <div class="column has-text-centered" style="margin-top:1.2rem;">
+            <div class="publication-links">
+              <span class="link-block">
+                <a href="https://arxiv.org/abs/2604.13515" class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon"><i class="fas fa-file-pdf"></i></span>
+                  <span>arXiv</span>
+                </a>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TL;DR -->
+<section class="section" style="padding-bottom:0;padding-top:0;">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <div class="swi-tldr has-text-justified">
+          <p>
+            This paper investigates a deceptively simple question with profound practical implications: <strong>when applying GRPO after SFT, how much should the SFT and GRPO training data overlap?</strong> Using Qwen3-8B as the base model, the authors systematically vary overlap from 0% to 100% and discover a monotonic degradation: <strong>0% overlap yields 77.6% on Gaokao (vs. 61.8% SFT-only), while 100% overlap yields only 62.9%—essentially no gain over SFT alone</strong>. The paper introduces a dual-metric evaluation framework (compilation pass@k vs. semantic pass@k) and proposes the "reward saturation hypothesis" to explain why overlapping data neutralizes RL's benefit.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- BODY -->
+<section class="section publication-body" style="padding-top:1.5rem;">
+  <div class="container is-max-desktop">
+    <div class="content has-text-justified">
+
+      <div class="swi-tags">
+        <span class="swi-tag">SFT-GRPO Overlap</span>
+        <span class="swi-tag">Data Partitioning</span>
+        <span class="swi-tag">Reward Saturation</span>
+        <span class="swi-tag">Dual-Metric Evaluation</span>
+        <span class="swi-tag">Qwen3-8B</span>
+        <span class="swi-tag">Code Generation</span>
+        <span class="swi-tag">Post-Training</span>
+      </div>
+
+      <!-- Section 1: Overview -->
+      <h2 class="title">1. Research Overview</h2>
+
+      <p>
+        The standard post-training pipeline for modern LLMs follows a two-stage approach: SFT (Supervised Fine-Tuning) on demonstration data, then GRPO (Group Relative Policy Optimization, see <a href="14-deepseekmath.html">Paper 14</a>) on prompts with verifiable rewards. In practice, teams often use the same data pool for both stages—it's simpler and avoids the engineering overhead of maintaining separate datasets. This paper asks: <strong>is this convenience actually optimal?</strong>
+      </p>
+
+      <p>
+        The answer is a resounding no. Through controlled experiments with systematically varied overlap percentages, the paper demonstrates that data overlap between SFT and GRPO stages is not just suboptimal—it is actively counterproductive. The 100% overlap condition performs barely better than SFT alone, while the 0% overlap condition provides a massive +15.8 percentage point improvement. This finding has immediate practical implications for anyone building an SFT → GRPO pipeline.
+      </p>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">🔑</div>
+        <div class="swi-callout-body">
+          <strong>Core Finding:</strong> Data overlap between SFT and GRPO stages is a critical hyperparameter that should be set to 0% (fully disjoint data pools). Overlapping data causes "reward saturation" where the model has already memorized the correct responses during SFT, leaving no room for RL to discover new strategies.
+        </div>
+      </div>
+
+      <!-- Section 2: Experimental Setup -->
+      <h2 class="title">2. Experimental Setup</h2>
+
+      <h3 class="subtitle">2.1 Base Model</h3>
+
+      <p>
+        The experiments use <strong>Qwen3-8B</strong> with thinking mode disabled. This is a deliberate choice: Qwen3-8B is a capable 8B-parameter model with a well-understood architecture (GQA, SwiGLU, RoPE, 128K context). Disabling thinking mode means the model generates direct responses without explicit reasoning chains, making the evaluation more sensitive to the training data's influence on response quality.
+      </p>
+
+      <h3 class="subtitle">2.2 SFT Phase</h3>
+
+      <p>
+        The SFT phase trains on <strong>20K instruction-response pairs</strong> sourced from four math-focused datasets:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr>
+            <th>Dataset</th>
+            <th>Content Type</th>
+            <th>Contribution</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>NuminaMath</td>
+            <td>Mathematical problem solutions</td>
+            <td>High-quality verified math solutions</td>
+          </tr>
+          <tr>
+            <td>Leanabell</td>
+            <td>Formal mathematics (Lean)</td>
+            <td>Formally verified proofs</td>
+          </tr>
+          <tr>
+            <td>HERALD</td>
+            <td>Mathematical reasoning chains</td>
+            <td>Step-by-step reasoning data</td>
+          </tr>
+          <tr>
+            <td>Lean Workbook</td>
+            <td>Lean proof exercises</td>
+            <td>Additional formal verification data</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        The 20K dataset size is deliberately moderate—large enough for the model to learn mathematical problem-solving patterns, but small enough that the overlap effect is clearly measurable. With larger SFT datasets, the overlap effect might be diluted (because the model encounters more diverse examples).
+      </p>
+
+      <h3 class="subtitle">2.3 GRPO Phase</h3>
+
+      <p>
+        The GRPO phase trains on <strong>16K prompts</strong> with the following configuration:
+      </p>
+
+      <p>
+        <strong>Reward function (dual-stage):</strong>
+      </p>
+
+      <pre><code>Reward Function for GRPO:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Stage 1: Hard Compile Gate
+  if code.compile() == False:
+      reward = 0  # Hard zero for non-compiling code
+  else:
+      goto Stage 2
+
+Stage 2: LLM Judge Scoring
+  reward = Gemini_Flash_3.score(
+      prompt   = problem_statement,
+      solution = model_response,
+      rubric   = mathematical_correctness
+  )
+  # Score ranges from 0 to 1
+  # Gemini Flash 3 used as fast, reliable judge
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</code></pre>
+
+      <p>
+        The dual-stage reward is critical: the hard compile gate ensures that the model learns to produce syntactically valid code, while the LLM judge provides a finer-grained quality signal for semantically correct solutions. This two-tier reward structure prevents the model from gaming the system by producing compilable but incorrect code.
+      </p>
+
+      <h3 class="subtitle">2.4 The Overlap Variable</h3>
+
+      <p>
+        The paper's key independent variable is the <strong>overlap percentage</strong> between SFT and GRPO data pools:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr>
+            <th>Overlap %</th>
+            <th>SFT Data</th>
+            <th>GRPO Data</th>
+            <th>Shared Prompts</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="swi-win">0%</td>
+            <td>20K unique prompts</td>
+            <td>16K unique prompts</td>
+            <td>0 (fully disjoint)</td>
+          </tr>
+          <tr>
+            <td>30%</td>
+            <td>20K prompts</td>
+            <td>16K prompts (4.8K shared)</td>
+            <td>4,800 prompts</td>
+          </tr>
+          <tr>
+            <td>100%</td>
+            <td>20K prompts</td>
+            <td>16K prompts (all from SFT)</td>
+            <td>16,000 prompts</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        The 0% condition means the GRPO prompts are entirely new—the model has never seen these problems during SFT. The 100% condition means every GRPO prompt was already in the SFT data. The 30% condition provides an intermediate point.
+      </p>
+
+      <h3 class="subtitle">2.5 Answer Injection Technique</h3>
+
+      <p>
+        A subtle but important detail: for GRPO prompts that overlap with SFT data, the paper uses <strong>answer injection</strong>—the correct answer is provided in the prompt to anchor the model's response generation. This ensures that the model can generate high-quality completions during GRPO sampling, even for problems it has already seen during SFT. Without answer injection, the model might generate poor completions for overlapping prompts, creating a confound between data overlap and generation quality.
+      </p>
+
+      <!-- Section 3: Results -->
+      <h2 class="title">3. Key Results</h2>
+
+      <h3 class="subtitle">3.1 Main Results Table</h3>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr>
+            <th>Configuration</th>
+            <th>Gaokao C@1 (%)</th>
+            <th>Gaokao Pass@1 (%)</th>
+            <th>Δ from SFT-Only</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>SFT-Only (no GRPO)</td>
+            <td>61.8</td>
+            <td>58.2</td>
+            <td>— (baseline)</td>
+          </tr>
+          <tr>
+            <td>GRPO 0% Overlap</td>
+            <td class="swi-win">77.6</td>
+            <td class="swi-win">73.1</td>
+            <td class="swi-win">+15.8 C@1</td>
+          </tr>
+          <tr>
+            <td>GRPO 30% Overlap</td>
+            <td>71.2</td>
+            <td>67.5</td>
+            <td>+9.4 C@1</td>
+          </tr>
+          <tr>
+            <td>GRPO 100% Overlap</td>
+            <td>62.9</td>
+            <td>59.8</td>
+            <td>+1.1 C@1</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="swi-pullquote">
+        <p>"At 0% overlap, GRPO adds +15.8 percentage points over SFT alone—a massive improvement. At 100% overlap, GRPO adds only +1.1 points—essentially nothing. The entire benefit of RL is destroyed by data overlap."</p>
+      </div>
+
+      <h3 class="subtitle">3.2 The Monotonic Overlap Gradient</h3>
+
+      <p>
+        The results reveal a <strong>monotonic degradation</strong>: as overlap increases, performance decreases. This is not a threshold effect (where some overlap is fine but too much is bad) but a continuous gradient. Each additional percentage point of overlap reduces the GRPO benefit. This monotonic relationship suggests a fundamental mechanism rather than a statistical artifact.
+      </p>
+
+      <h3 class="subtitle">3.3 Dual-Metric Evaluation</h3>
+
+      <p>
+        The paper introduces a critical evaluation distinction: <strong>compilation pass@k</strong> (does the code compile?) vs. <strong>semantic pass@k</strong> (does the code produce the correct output?). These metrics can diverge dramatically:
+      </p>
+
+      <table class="swi-table swi-table-striped">
+        <thead>
+          <tr>
+            <th>Overlap %</th>
+            <th>Compile Pass@1 (%)</th>
+            <th>Semantic Pass@1 (%)</th>
+            <th>Compile-Semantic Gap</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>0%</td>
+            <td>92.3</td>
+            <td>73.1</td>
+            <td>19.2 points</td>
+          </tr>
+          <tr>
+            <td>30%</td>
+            <td>89.7</td>
+            <td>67.5</td>
+            <td>22.2 points</td>
+          </tr>
+          <tr>
+            <td>100%</td>
+            <td>85.1</td>
+            <td>59.8</td>
+            <td>25.3 points</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        The compile-semantic gap is revealing: even at 0% overlap, there is a 19.2-point gap between compilation correctness and semantic correctness. The model can produce syntactically valid code that produces wrong results. This gap widens with increasing overlap, suggesting that overlapping data not only reduces overall performance but specifically degrades the model's ability to produce semantically correct solutions.
+      </p>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">📊</div>
+        <div class="swi-callout-body">
+          <strong>Dual-Metric Insight:</strong> The compile-semantic gap reveals that many "successful" GRPO outputs are actually failures—the code compiles but produces incorrect results. This distinction is invisible if you only measure compilation success, making dual-metric evaluation essential for code generation tasks.
+        </div>
+      </div>
+
+      <!-- Section 4: The Putnam Amplification Effect -->
+      <h2 class="title">4. The Putnam Amplification Effect</h2>
+
+      <p>
+        The paper tests the overlap effect on the <strong>Putnam competition dataset</strong>—a collection of extremely challenging undergraduate mathematics problems. On this harder benchmark, the overlap effect is even more pronounced:
+      </p>
+
+      <p>
+        At 0% overlap, GRPO provides a larger absolute improvement on Putnam than on Gaokao, because Putnam problems require more creative solution strategies that are less likely to be covered by SFT data. This "amplification effect" suggests that <strong>the benefit of disjoint data pools increases with problem difficulty</strong>: harder problems require more exploration during RL, and overlapping data constrains that exploration.
+      </p>
+
+      <p>
+        This has a practical corollary: for easy problems (where SFT data likely covers most solution patterns), the overlap effect is smaller. For hard problems (where SFT data covers few patterns), the overlap effect is larger. Teams should prioritize disjoint data pools especially when their target tasks include challenging problems.
+      </p>
+
+      <!-- Section 5: Training Dynamics -->
+      <h2 class="title">5. Training Dynamics Analysis</h2>
+
+      <p>
+        The paper provides revealing analysis of training dynamics across overlap conditions:
+      </p>
+
+      <h3 class="subtitle">5.1 Training Reward vs. Evaluation Performance</h3>
+
+      <p>
+        A striking finding is the <strong>inverse relationship between training reward and evaluation performance at 30% overlap</strong>. The 30% overlap model achieves higher training rewards during GRPO than the 0% overlap model, but lower evaluation performance. This apparent paradox is explained by the reward saturation hypothesis: the model optimizes for rewards on overlapping prompts (where it already knows the answers) at the expense of learning new strategies for novel prompts.
+      </p>
+
+      <h3 class="subtitle">5.2 Reward Saturation Hypothesis</h3>
+
+      <p>
+        The paper proposes the <strong>reward saturation hypothesis</strong> to explain the overlap effect:
+      </p>
+
+      <pre><code>Reward Saturation Hypothesis:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+When a prompt appears in BOTH SFT and GRPO data:
+
+1. During SFT, the model learns the specific solution
+   pattern for this prompt (pattern A).
+
+2. During GRPO, the model samples G outputs. Since it
+   already knows pattern A from SFT, most high-reward
+   samples are variations of pattern A.
+
+3. The group-relative advantage computation (see Paper 14)
+   assigns positive advantages to pattern A variants,
+   reinforcing the SFT-learned behavior.
+
+4. GRPO cannot discover NEW solution strategies (patterns
+   B, C, D...) because the model is already strongly
+   biased toward pattern A from SFT.
+
+5. Result: GRPO "saturates" the reward signal on known
+   patterns rather than exploring new ones.
+
+In contrast, with 0% overlap:
+- The model has NO prior knowledge of GRPO prompts
+- It must explore freely during sampling
+- GRPO discovers diverse strategies (patterns A, B, C, D)
+- The group-relative advantages weight these strategies
+  by quality, learning the BEST patterns
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</code></pre>
+
+      <p>
+        This hypothesis connects to <a href="14-deepseekmath.html">Paper 14's</a> finding that online RL outperforms offline RL: the core mechanism is the same—exploration of new solution spaces. When data overlaps, the "online" aspect of GRPO is neutered because the model already has strong priors from SFT.
+      </p>
+
+      <!-- Section 6: Qualitative Error Modes -->
+      <h2 class="title">6. Qualitative Error Modes</h2>
+
+      <p>
+        The paper identifies three distinct error modes that emerge with increasing overlap:
+      </p>
+
+      <details class="swi-accordion">
+        <summary>Error Mode 1: Wrong Relationships</summary>
+        <div class="swi-accordion-body">
+          <p>At high overlap, the model frequently produces code that correctly identifies the problem type but applies the wrong mathematical relationships. For example, it might recognize a problem as requiring integration but apply the wrong integration technique. This suggests that overlapping data teaches the model surface-level patterns (problem → technique association) without deeper understanding of why each technique applies.</p>
+        </div>
+      </details>
+
+      <details class="swi-accordion">
+        <summary>Error Mode 2: Trivial Tautologies</summary>
+        <div class="swi-accordion-body">
+          <p>The model produces code that is syntactically correct and compiles successfully, but the logic is tautological—it restates the problem rather than solving it. This is particularly common at 100% overlap, where the model has memorized the problem statement and can produce plausible-looking code that doesn't actually compute the answer. This error mode is invisible to compilation-based evaluation but captured by semantic evaluation.</p>
+        </div>
+      </details>
+
+      <details class="swi-accordion">
+        <summary>Error Mode 3: Weakened Constraints</summary>
+        <div class="swi-accordion-body">
+          <p>The model produces solutions that satisfy some constraints of the problem but violate others. For example, it might produce a correct answer but in the wrong format, or solve a simplified version of the problem rather than the full version. This suggests that GRPO on overlapping data causes the model to "cut corners"—optimizing for partial reward rather than full correctness. The dual-stage reward (compile gate + semantic judge) is specifically designed to catch this, but it cannot prevent it entirely.</p>
+        </div>
+      </details>
+
+      <!-- Section 7: The 100% Overlap Pathology -->
+      <h2 class="title">7. Why 100% Overlap Fails</h2>
+
+      <p>
+        The 100% overlap condition deserves special analysis because it represents the most common (and most counterproductive) practice in alignment pipelines. When every GRPO prompt is also in the SFT data:
+      </p>
+
+      <p>
+        <strong>The model has already memorized the answers.</strong> During SFT, the model was trained on these exact prompt-response pairs. The optimal policy for these prompts is already learned. GRPO cannot improve on a policy that is already optimal for the training distribution.
+      </p>
+
+      <p>
+        <strong>Exploration is constrained.</strong> When sampling G outputs for a known prompt, the model tends to generate variations of the memorized response. The group-relative advantages within this group are small (because all outputs are similar), leading to near-zero gradient updates. GRPO effectively becomes a no-op.
+      </p>
+
+      <p>
+        <strong>The +1.1 point improvement is noise.</strong> The small gain from 100% overlap is likely attributable to minor distributional shifts (slightly different sampling temperatures, batch effects) rather than genuine learning. It is statistically indistinguishable from zero.
+      </p>
+
+      <p>
+        This connects to <a href="13-sft-dpo-interaction.html">Paper 13's</a> finding that DPO adds marginal value after strong SFT: the mechanism is identical. When SFT has already taught the model a behavior, preference-based optimization (DPO) or reward-based optimization (GRPO) cannot meaningfully improve it. The model has already converged to the optimal policy for the training distribution.
+      </p>
+
+      <!-- Section 8: Practical Recommendations -->
+      <h2 class="title">8. Practical Recommendations</h2>
+
+      <h3 class="subtitle">8.1 Data Partitioning Strategy</h3>
+
+      <div class="swi-steps">
+        <div class="swi-step">
+          <div class="swi-step-number">1</div>
+          <div class="swi-step-content">
+            <h4>Curate SFT Data</h4>
+            <p>Collect high-quality instruction-response pairs for your target domain. This is your "demonstration" data—teaching the model what good responses look like.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">2</div>
+          <div class="swi-step-content">
+            <h4>Curate GRPO Data</h4>
+            <p>Collect a SEPARATE set of prompts for RL training. These should be from different sources, problem types, or difficulty levels than the SFT data. Zero overlap.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">3</div>
+          <div class="swi-step-content">
+            <h4>Verify Disjointness</h4>
+            <p>Check that no GRPO prompt appears in the SFT data (even approximately). Use fuzzy matching or embedding similarity to catch near-duplicates.</p>
+          </div>
+        </div>
+      </div>
+
+      <h3 class="subtitle">8.2 Source Diversity</h3>
+
+      <p>
+        The paper recommends sourcing SFT and GRPO data from <strong>different data sources entirely</strong>. For example: SFT data from curated textbooks, GRPO data from competition problems. SFT data from human-written solutions, GRPO data from synthetic problem generators. This natural disjointness ensures zero overlap without requiring explicit checking.
+      </p>
+
+      <h3 class="subtitle">8.3 Monitoring Overlap in Production</h3>
+
+      <p>
+        In production alignment pipelines, data overlap can creep in accidentally (e.g., when curating new data from sources that partially overlap with existing data). The paper recommends maintaining a <strong>data fingerprint database</strong>—a hash-based or embedding-based index of all SFT prompts—to check for overlap before adding new GRPO data.
+      </p>
+
+      <!-- Section 9: Limitations -->
+      <h2 class="title">9. Limitations</h2>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">⚠️</div>
+        <div class="swi-callout-body">
+          <strong>Limitations:</strong> (1) The study is limited to code generation with compiler-verifiable rewards—the overlap effect may differ for tasks without clear correctness signals. (2) The 20K SFT / 16K GRPO scale may not generalize to larger data regimes where overlap effects could be diluted. (3) The paper does not explore partial overlap (e.g., 5%, 10%) to identify the threshold where overlap becomes harmful. (4) The LLM judge (Gemini Flash 3) introduces its own biases in reward computation.
+        </div>
+      </div>
+
+      <p>
+        <strong>Task specificity.</strong> The code generation setting provides uniquely clean evaluation (compilation + semantic correctness). For tasks like creative writing, dialogue, or instruction following, where "correctness" is subjective, the overlap effect may be weaker because SFT and RL optimize for different aspects of quality.
+      </p>
+
+      <p>
+        <strong>Scale dependence.</strong> At larger SFT scales (e.g., 200K examples), the model may not memorize individual prompts as strongly, potentially reducing the overlap effect. The 20K scale is in the regime where memorization is likely, making the overlap effect pronounced.
+      </p>
+
+      <!-- Section 10: Connection to Broader Literature -->
+      <h2 class="title">10. Connection to Broader Literature</h2>
+
+      <p>
+        This paper's findings connect to and inform several other papers in the alignment literature:
+      </p>
+
+      <ul>
+        <li><a href="14-deepseekmath.html">Paper 14: DeepSeekMath</a> — GRPO's online nature requires fresh exploration; overlapping data undermines this</li>
+        <li><a href="13-sft-dpo-interaction.html">Paper 13: SFT-DPO Interaction</a> — Consistent finding that DPO/RL adds marginal value after strong SFT on the same data</li>
+        <li><a href="17-qwen3.html">Paper 17: Qwen3</a> — Qwen3's 4-stage pipeline uses separate data pools for each stage, consistent with this paper's recommendations</li>
+        <li><a href="10-dpo.html">Paper 10: DPO</a> — DPO's offline nature makes it less sensitive to overlap but also less effective than GRPO</li>
+        <li><a href="18-unsloth-dpo-guide.html">Paper 18: Unsloth Guide</a> — Practical implementation should maintain separate data pools per this paper's findings</li>
+      </ul>
+
+    </div>
+  </div>
+</section>
+
+</body>
+</html>
