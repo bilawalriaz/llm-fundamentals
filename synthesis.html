@@ -689,6 +689,63 @@
         </div>
       </details>
 
+      <!-- INSIGHT 18: Creative Writing GRPO — Corrected -->
+      <h2 style="font-family: 'Google Sans', sans-serif; font-size: 1.85rem; font-weight: 700; margin-top: 3rem;">18. Creative Writing GRPO: Reward-Modelled, Not Verified</h2>
+
+      <p>The papers treat verifiable domains (math, code) and subjective domains (creative writing) as requiring fundamentally different algorithms. That's wrong. The difference is in the <em>reward signal</em>, not the algorithm. GRPO can work on creative writing — but with critical caveats the papers don't address.</p>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">⚠️</div>
+        <div class="swi-callout-body">
+          <strong>Correction from peer review:</strong> "Every domain becomes verifiable once you train a classifier" is overclaim. Better version: <strong>many subjective domains become cheaply rankable enough for RL.</strong> A compiler says "this code compiles" — deterministic, hard to argue with. A creative reward classifier says "this text resembles outputs that humans/LLMs labelled high-quality" — probabilistic, style-biased, gameable, and distribution-sensitive. These are not the same thing.
+        </div>
+      </div>
+
+      <p>The architecture that's actually testable:</p>
+
+      <div class="swi-steps">
+        <div class="swi-step">
+          <div class="swi-step-number">1</div>
+          <div class="swi-step-content">
+            <h4>Human + SOTA LLM define style</h4>
+            <p>Small batch of human evaluations (200–500 examples) calibrate a SOTA LLM's taste. This becomes the ground truth calibration set for a domain-specific reward model.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">2</div>
+          <div class="swi-step-content">
+            <h4>Train reward classifier</h4>
+            <p>Small model (0.5B–1B) trained on calibrated labels. This is a <em>learned aesthetic filter</em>, not a compiler. It replaces the LLM judge, not the compiler gate.</p>
+          </div>
+        </div>
+        <div class="swi-step">
+          <div class="swi-step-number">3</div>
+          <div class="swi-step-content">
+            <h4>GRPO on tiny model</h4>
+            <p>0.5B generates G=64 completions. Classifier scores each. GRPO updates policy. Disjoint data from SFT per Paper 15.</p>
+          </div>
+        </div>
+      </div>
+
+      <p><strong>Why GRPO doesn't automatically win over DPO here:</strong> DPO may beat GRPO when the reward model is noisy, miscalibrated, or easy to exploit. DPO is boring but robust. GRPO is more interesting when you can generate many candidates and score them cheaply. The choice depends on reward model quality, not domain type.</p>
+
+      <p><strong>The Goodhart's Law problem:</strong> As the policy improves, it moves out of the classifier's training distribution and finds adversarial quirks. Reward models rot under optimization. The model may learn to write like a contest entrant seducing the judge — purple prose, emotional overstatement, fake profundity, verbosity — rather than like a better writer. Very common. Very dangerous.</p>
+
+      <div class="swi-callout">
+        <div class="swi-callout-icon">🔬</div>
+        <div class="swi-callout-body">
+          <strong>Tighter experimental design:</strong> Train four models from the same 0.5B base: (1) SFT only, (2) DPO from pairwise preferences, (3) GRPO using SOTA LLM judge directly, (4) GRPO using trained reward classifier. Evaluate with <strong>blind human ranking on prompts never seen by SFT, reward model, or GRPO.</strong> Also measure classifier-human correlation before and after GRPO. The key result is not "classifier score goes up" — that's trivial and maybe Goodhart. The key result: <strong>classifier score goes up AND blind human preference also goes up without style collapse.</strong>
+        </div>
+      </div>
+
+      <p><strong>What actually needs periodic relabelling:</strong> "Train it once, use forever" is dangerous. As the policy improves, it will exploit the classifier's blind spots. You need: periodic relabelling with fresh human+LLM evaluations, adversarial examples in the training set, and human holdout sets to detect drift. The classifier is a compressed teacher/human preference manifold — the ceiling becomes "classifier-recognisable quality," not true quality.</p>
+
+      <p><strong>The corrected thesis:</strong> "Can a small calibrated reward model act as a practical verifier proxy for subjective generation, enabling GRPO-style online improvement in tiny LMs?" That's a genuinely good research question. The answer: probably yes, with caveats about Goodhart's Law, style collapse, and periodic recalibration. The publishable framing: <strong>many subjective domains become cheaply rankable enough for RL.</strong></p>
+
+      <div class="swi-pullquote">
+        <p>"Creative writing has no compiler, but it can have a calibrated reward model. GRPO does not require objective truth; it requires a reward signal with enough local consistency that group-relative ranking improves the policy faster than it exploits the reward model."</p>
+      </div>
+
       <!-- CLOSING -->
       <h2 style="font-family: 'Google Sans', sans-serif; font-size: 1.85rem; font-weight: 700; margin-top: 2.5rem;">What This Means for You</h2>
 
