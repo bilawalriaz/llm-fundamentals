@@ -570,75 +570,37 @@ When α = 2r: the update is amplified 2×</code></pre>
       <h2 class="title">Evidence for Intrinsic Low-Rank Structure</h2>
 
       <p>
-        One of the most important contributions of the LoRA paper is providing empirical evidence that weight updates during fine-tuning have low intrinsic rank. The authors demonstrate this through two key analyses:
+        One of the most important contributions of the LoRA paper is empirical evidence that weight updates during fine-tuning have low intrinsic rank. The paper's case rests on how rank affects accuracy (Table 6), how the update's dominant directions behave across ranks and random seeds (Figures 3, 4, 6, 7), and how ΔW relates to the pre-trained weights (Section 7.3, Appendix H).
       </p>
 
-      <h3 class="subtitle">Analysis 1: Rank Comparison Across Seeds</h3>
+      <h3 class="subtitle">Analysis 1: Subspace Similarity Across Ranks and Seeds</h3>
 
       <p>
-        The authors fine-tune RoBERTa-large on WikiSQL and MultiNLI with different random seeds and LoRA ranks (r = 4, 16, 64). They then perform SVD on the resulting ΔW matrices and measure the cosine similarity between the top singular vectors across different configurations:
-      </p>
-
-      <pre><code>Cosine similarity of top singular vectors of ΔW:
-
-                r=4     r=16    r=64
-Same seed,
-diff rank:      0.98    0.97    0.96
-
-Diff seed,
-same rank:      0.95    0.94    0.93
-
-Cross:          0.93    0.92    0.91</code></pre>
-
-      <p>
-        The consistently high cosine similarity (> 0.9) across different ranks and random seeds demonstrates that the dominant directions of the weight update are stable and consistent. This means the full-rank update ΔW has low intrinsic dimensionality — the same information can be captured with a much lower rank.
-      </p>
-
-      <h3 class="subtitle">Analysis 2: Full Fine-Tuning ΔW vs. LoRA ΔW</h3>
-
-      <p>
-        When the authors perform SVD on the full fine-tuning update ΔW<sub>full</sub> (from training all parameters), they find that the top singular vectors of ΔW<sub>full</sub> are highly correlated with the top singular vectors of ΔW<sub>LoRA</sub>, even though LoRA was trained with a much smaller parameter budget:
-      </p>
-
-      <pre><code>Cosine similarity between ΔW_full and ΔW_LoRA:
-
-RoBERTa-large on WikiSQL:
-  r=4:   0.91
-  r=16:  0.96
-  r=64:  0.98
-
-RoBERTa-large on MNLI:
-  r=4:   0.89
-  r=16:  0.95
-  r=64:  0.97</code></pre>
-
-      <p>
-        This is striking: LoRA with r = 64 captures > 97% of the direction of the full fine-tuning update. The low-rank approximation is not merely an approximation — it recovers the actual dominant structure of the adaptation.
+        The authors compare the top singular directions of ΔW<sub>q</sub> and ΔW<sub>v</sub> from a rank-8 adapter with those from a rank-64 adapter, and separately compare two runs with different random seeds. In both cases the dominant directions overlap substantially: the normalised subspace similarity for the top directions is close to 1, and it decays for the lower directions. The paper reports this as Figures 3 and 4, and generalises it to other layers in Figures 6 and 7. The leading directions of the update are stable across rank and seed, which is what makes a low rank sufficient.
       </p>
 
       <h3 class="subtitle">ΔW Amplification vs. Duplication</h3>
 
       <p>
-        A critical question is whether the low-rank update ΔW merely duplicates what's already in the pre-trained weights W<sub>0</sub>, or whether it genuinely amplifies new, task-specific features. The authors analyze this by comparing the spectral structure of W<sub>0</sub> and ΔW:
+        A critical question is whether the low-rank update ΔW merely duplicates what's already in the pre-trained weights W<sub>0</sub>, or whether it amplifies task-specific features. The authors analyse this on GPT-3 (layer 48) by comparing the subspaces spanned by W<sub>0</sub> and ΔW:
       </p>
 
-      <pre><code>Spectral analysis (RoBERTa-large, r=4):
+      <pre><code>Spectral analysis (GPT-3, layer 48, q_proj):
 
-ΔW singular values:  [8.2, 3.1, 1.4, 0.8]
-W₀ singular values:  [42.1, 31.5, 24.8, ...]
+‖W_q‖_F  = 6.91
+‖ΔW_q‖_F = 3.57
+Amplification factor (r=4):
+  ‖ΔW‖_F / ‖UᵀWVᵀ‖_F ≈ 21.5
 
-Ratio ΔW/W₀ for top 4 singular values:
-  [0.19, 0.10, 0.06, 0.03]
-
-Key: ΔW is ~20× smaller than W₀ but operates
-in DIFFERENT directions — amplification, not duplication.</code></pre>
+Subspace similarity between ΔW's top singular
+directions and the top 10% of W's: below 0.2.</code></pre>
 
       <p>
-        The analysis shows that ΔW's singular vectors are nearly orthogonal to the top singular vectors of W<sub>0</sub>. This means the low-rank update is not simply scaling up what the pre-trained model already knows — it's introducing new, task-specific directions that the pre-training objective didn't emphasize. This is the phenomenon of "amplification" that the authors identify.
+        The paper draws three conclusions. ΔW correlates more with W than a random matrix does, so it amplifies features already present in W. But it does not repeat W's top singular directions; it amplifies directions that are important yet under-emphasised during pre-training. For r=4 the amplification factor is about 21.5, falling to about 2 at r=64. That is the "amplification" phenomenon the authors identify: LoRA re-weights task-specific directions rather than learning them from scratch.
       </p>
 
       <div class="swi-pullquote">
-        <p>"The pre-trained model has already learned a rich representation. Fine-tuning doesn't need to learn new knowledge — it needs to amplify task-specific features that were under-emphasized during pre-training. LoRA does exactly this, with remarkable parameter efficiency."</p>
+        <p>The pre-trained model already holds a rich representation. Adaptation does not need to learn new knowledge; it needs to amplify task-specific features that were under-emphasised during pre-training. LoRA does this with remarkable parameter efficiency.</p>
       </div>
 
       <!-- SECTION 4: Results -->
@@ -701,23 +663,23 @@ in DIFFERENT directions — amplification, not duplication.</code></pre>
         One of the most practically useful findings in the paper is the relationship between rank r and downstream performance:
       </p>
 
-      <pre><code>Performance vs. Rank (RoBERTa-large, MNLI):
+      <pre><code>Validation accuracy vs. rank (GPT-3, Table 6):
 
-r=1:   87.8  ← already strong
-r=2:   88.4
-r=4:   90.2  ← near-optimal
-r=8:   90.6  ← optimal point
-r=16:  90.5  ← plateau begins
-r=32:  90.6  ← no improvement
-r=64:  90.6  ← clearly diminishing returns
-r=128: 90.5  ← slight degradation (overfitting?)
+WikiSQL (±0.5%)        r=1   r=2   r=4   r=8   r=64
+  W_q                  68.8  69.6  70.5  70.4  70.0
+  W_q, W_v             73.4  73.3  73.7  73.8  73.5
+  W_q, W_k, W_v, W_o   74.1  73.7  74.0  74.0  73.9
 
-Key: Performance plateaus at r=8, suggesting
-the task-specific adaptation has intrinsic
-dimensionality of ~8 or less.</code></pre>
+MultiNLI (±0.1%)
+  W_q                  90.7  90.9  91.1  90.7  90.7
+  W_q, W_v             91.3  91.4  91.3  91.6  91.4
+  W_q, W_k, W_v, W_o   91.2  91.7  91.7  91.5  91.4
+
+Key: rank 1 is enough to adapt W_q and W_v together
+on both datasets; adapting W_q alone needs more rank.</code></pre>
 
       <p>
-        The plateau at r ≈ 8 across multiple tasks and models provides strong evidence for the intrinsic low-rank hypothesis. The weight updates during fine-tuning live in a low-dimensional subspace of the full parameter space, and capturing the top 4-8 dimensions is sufficient for most tasks.
+        Rank barely moves accuracy once the right weight matrices are adapted. The paper's reading is that the update lives in a low-dimensional subspace, and which subspace you adapt matters more than how large the rank is.
       </p>
 
       <h3 class="subtitle">Learning Rate and Batch Size</h3>

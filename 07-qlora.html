@@ -691,14 +691,14 @@ Key: The base weight computation uses 4-bit storage
         The paper uses GPT-4 as an evaluation proxy, comparing model outputs side-by-side and asking GPT-4 to select the better response. This raises the question of reliability. The authors find:
       </p>
 
-      <pre><code>GPT-4 vs. Human Agreement (Kendall τ):
+      <pre><code>GPT-4 vs. Human Agreement:
 
-  GPT-4 vs. Human rankings: τ = 0.43 (p < 0.001)
-  GPT-4 vs. ChatGPT rankings: τ = 0.55 (p < 0.001)
+  System level:  Kendall τ = 0.43, Spearman r = 0.55
+  Example level: Fleiss κ = 0.25
 
-  Interpretation: Moderate but significant agreement.
-  GPT-4 can distinguish model quality but is not
-  a perfect proxy for human judgment.</code></pre>
+  Interpretation: moderate agreement at the system level,
+  weaker at the example level. GPT-4 can rank models
+  roughly like humans, but it is not a per-response proxy.</code></pre>
 
       <p>
         The moderate correlation (τ = 0.43) suggests that while GPT-4 evaluation is useful for ranking models, it should not be treated as a ground truth for absolute quality. The authors are careful to supplement GPT-4 evaluation with human studies where possible.

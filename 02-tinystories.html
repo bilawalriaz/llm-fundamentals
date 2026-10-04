@@ -401,17 +401,8 @@
         The paper provides evidence for a <strong>polynomial relationship</strong> between model size and performance on the GPT-Eval metrics. As model parameters increase from 3M to 60M, performance improves following a power law:
       </p>
 
-<pre><code>Score ∝ N^α
-
-where:
-  N = number of parameters
-  α ≈ 0.3-0.5 (varies by capability)
-  Grammar: α ≈ 0.3 (diminishing returns, already good at small scale)
-  Consistency: α ≈ 0.4 (steady improvement)
-  Creativity: α ≈ 0.5 (strongest scaling, most room to improve)</code></pre>
-
       <p>
-        This is significant because it suggests that the scaling laws observed at billion-parameter scales (Kaplan et al., 2020; Hoffmann et al., 2022) also hold at much smaller scales. The different exponents for different capabilities confirm the emergence hierarchy: capabilities with higher exponents require more scaling to improve, consistent with them being more demanding.
+        The paper shows that GPT-Eval performance improves with model size along a power-law curve, the same shape seen at billion-parameter scales (Kaplan et al., 2020; Hoffmann et al., 2022). It does not report a separate exponent per capability. What the paper documents is the emergence order: grammar reaches near-perfect scores first, consistency emerges around hidden size 128, and creativity improves last.
       </p>
 
       <h3 class="title">8.2 Data Scaling</h3>

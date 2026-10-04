@@ -105,7 +105,7 @@
       <div class="column is-four-fifths">
         <div class="swi-tldr has-text-justified">
           <p>
-            Phi-3 is Microsoft's family of small language models—spanning Phi-3-mini (3.8B), Phi-3-small (7B), and Phi-3-medium (14B)—that demonstrates models trained on carefully curated, textbook-quality data can rival models 10× larger on standard benchmarks. The 3.8B model runs on an iPhone with &gt;30 tokens/second and outperforms Mixtral-8x7B and GPT-3.5 on many tasks. Key technical innovations include <strong>LongRope</strong> (extending RoPE to 128K context without full retraining), <strong>blocksparse attention</strong> (Triton-kernel-based efficient attention), and an MoE variant (16 experts, top-2 routing, ~3.3B active parameters). The report also introduces Phi-3.5-mini, Phi-3.5-MoE, and Phi-3.5-Vision, extending the family with multilingual, MoE, and multimodal capabilities. This paper proves that the data-optimal regime—where quality beats scale—is practical and deployable at the edge.
+            Phi-3 is Microsoft's family of small language models—spanning Phi-3-mini (3.8B), Phi-3-small (7B), and Phi-3-medium (14B)—that demonstrates models trained on carefully curated, textbook-quality data can rival models 10× larger on standard benchmarks. The 3.8B model runs on an iPhone with &gt;12 tokens/second and outperforms Mixtral-8x7B and GPT-3.5 on many tasks. Key technical innovations include <strong>LongRope</strong> (extending RoPE to 128K context without full retraining), <strong>blocksparse attention</strong> (Triton-kernel-based efficient attention), and an MoE variant (16 experts, top-2 routing, 6.6B active of 42B). The report also introduces Phi-3.5-mini, Phi-3.5-MoE, and Phi-3.5-Vision, extending the family with multilingual, MoE, and multimodal capabilities. This paper proves that the data-optimal regime—where quality beats scale—is practical and deployable at the edge.
           </p>
         </div>
       </div>
@@ -144,7 +144,7 @@
       <div class="swi-callout">
         <div class="swi-callout-icon">🎯</div>
         <div class="swi-callout-body">
-          <strong>Key Contributions:</strong> (1) Phi-3-mini (3.8B) matching models 10× larger. (2) LongRope extending context to 128K without full retraining. (3) Blocksparse attention with custom Triton kernels for efficient long-context inference. (4) MoE variant (16 experts, top-2, ~3.3B active) achieving dense-model quality at sparse-model cost. (5) Practical mobile deployment: INT4 quantized model runs on iPhone at &gt;30 tok/s.
+          <strong>Key Contributions:</strong> (1) Phi-3-mini (3.8B) matching models 10× larger. (2) LongRope extending context to 128K without full retraining. (3) Blocksparse attention with custom Triton kernels for efficient long-context inference. (4) MoE variant (16 experts, top-2, 6.6B active of 42B) achieving dense-model quality at sparse-model cost. (5) Practical mobile deployment: INT4 quantized model runs on iPhone at &gt;12 tok/s.
         </div>
       </div>
 
@@ -201,7 +201,7 @@
           </tr>
           <tr>
             <td>Phi-3-MoE (3.5)</td>
-            <td>14B total / 3.3B active</td>
+            <td>42B total / 6.6B active</td>
             <td>128K</td>
             <td>32K</td>
             <td>Single GPU</td>
@@ -432,12 +432,12 @@ Compute: proportional to non-masked blocks
         <tbody>
           <tr>
             <td>Total Parameters</td>
-            <td class="swi-win">14B</td>
-            <td>Full model size</td>
+            <td class="swi-win">42B</td>
+            <td>16 experts × 3.8B</td>
           </tr>
           <tr>
             <td>Active Parameters</td>
-            <td class="swi-win">~3.3B</td>
+            <td class="swi-win">6.6B</td>
             <td>Per forward pass (top-2 routing)</td>
           </tr>
           <tr>
@@ -457,8 +457,8 @@ Compute: proportional to non-masked blocks
           </tr>
           <tr>
             <td>Inference Cost</td>
-            <td>~3.3B equivalent</td>
-            <td>Comparable to Phi-3-mini (3.8B dense)</td>
+            <td>6.6B activated</td>
+            <td>42B total parameters loaded</td>
           </tr>
         </tbody>
       </table>
@@ -491,18 +491,18 @@ Top-2 selection:
   expert_indices = topk(g, k=2)
   output = Σ_{i ∈ expert_indices} g_i × Expert_i(h)
 
-Effect: Each token is processed by only 2 of 16 experts,
-reducing active parameters from 14B to ~3.3B.
+Effect: each token is processed by 2 of 16 experts,
+so 6.6B of the 42B parameters are active.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</code></pre>
 
-      <h3 class="subtitle">6.2 Why MoE Matters for Mobile</h3>
+      <h3 class="subtitle">6.2 What MoE Trades</h3>
 
       <p>
-        MoE provides a unique advantage for edge deployment: the total model is large (14B, capturing rich knowledge), but each forward pass only activates a small subset (~3.3B). This means the model has the knowledge capacity of a 14B model but the compute cost of a ~3.3B model. For mobile deployment where inference speed is critical, this is a compelling tradeoff.
+        MoE trades memory for compute. The full 42B parameters must be resident, but each forward pass activates only 6.6B, so throughput is closer to a 6.6B dense model than a 42B one. That makes it a server-side efficiency trick, not the mobile path.
       </p>
 
       <p>
-        However, MoE introduces a memory overhead: all 14B parameters must be loaded into memory even though only ~3.3B are used per token. This is where quantization becomes essential—the 14B model can be quantized to INT4, reducing the memory footprint to ~7GB, which is feasible for modern mobile devices with 8-12GB RAM.
+        The mobile story in this paper is phi-3-mini: 3.8B dense, quantised to 4 bits at about 1.8GB, running offline on an iPhone. The MoE variant is a separate, larger model in the Phi-3.5 family.
       </p>
 
       <!-- Section 7: Training Pipeline -->
@@ -830,7 +830,7 @@ Key parameters for Phi-3:
       </p>
 
       <p>
-        <strong>MoE deployment overhead.</strong> While the MoE variant reduces active parameters to ~3.3B, the full 14B model must be loaded into memory. This makes MoE less suitable for extreme memory-constrained devices (e.g., embedded systems with &lt;4GB RAM) compared to the 3.8B dense model.
+        <strong>MoE deployment overhead.</strong> While the MoE variant activates only 6.6B parameters per token, the full 42B model must be loaded into memory. That rules it out for memory-constrained devices, where the 3.8B dense model is the better fit.
       </p>
 
       <p>

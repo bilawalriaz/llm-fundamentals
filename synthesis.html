@@ -333,7 +333,7 @@
       <!-- INSIGHT 5 -->
       <h2 style="font-family: 'Google Sans', sans-serif; font-size: 1.85rem; font-weight: 700; margin-top: 2.5rem;">5. The Alignment Tax Paradox</h2>
 
-      <p>Every paper shows that alignment training degrades base model performance by 1–5% on academic benchmarks. This is called the "alignment tax." But LIMA (Paper 08) simultaneously proves that alignment is superficial — it only teaches format, not knowledge.</p>
+      <p>Alignment training can cost a little accuracy on tasks outside the training distribution. The effect is called the "alignment tax," and it comes from the RLHF literature, where optimising for human preference reduces scores on some capability benchmarks. LIMA (Paper 08) argues that alignment is superficial — it teaches format, not knowledge.</p>
 
       <p><strong>Here's the paradox nobody resolves:</strong> If alignment is superficial (only format matching), why does it degrade factual knowledge?</p>
 
@@ -489,7 +489,7 @@
       <div class="swi-callout">
         <div class="swi-callout-icon">🎯</div>
         <div class="swi-callout-body">
-          <strong>The hidden consensus:</strong> LoRA learns weight deltas <em>orthogonal</em> to pretrained directions (Paper 06). DeepSeekMath's GRPO improves Maj@K but not Pass@K — the solutions already existed, they just weren't consistently chosen (Paper 14). DPO reweights log-ratios of <em>existing</em> outputs (Paper 10). Qwen3's Cold Start teaches <em>exhibition</em> of reasoning the model already possesses, not new reasoning ability (Paper 17). LIMA's 1,000 examples unlock assistant behavior already latent in the weights (Paper 08).
+          <strong>The hidden consensus:</strong> LoRA amplifies task-specific directions that pre-training under-emphasised (Paper 06). DeepSeekMath's GRPO improves Maj@K but not Pass@K — the solutions already existed, they just weren't consistently chosen (Paper 14). DPO reweights log-ratios of <em>existing</em> outputs (Paper 10). Qwen3's Cold Start teaches <em>exhibition</em> of reasoning the model already possesses, not new reasoning ability (Paper 17). LIMA's 1,000 examples unlock assistant behavior already latent in the weights (Paper 08).
         </div>
       </div>
 
@@ -512,7 +512,7 @@
         </thead>
         <tbody>
           <tr><td>Cannot count</td><td>Phi-1 (03)</td><td>Transformer architecture limitation, not a data problem — no amount of data fixes it</td></tr>
-          <tr><td>Math ceiling at ~32% GSM8K</td><td>SmolLM2 (04)</td><td>1.7B model simply cannot fit mathematical reasoning patterns</td></tr>
+          <tr><td>GSM8K plateaus at ~32% for the base model</td><td>SmolLM2 (04)</td><td>The 1.7B base model is far below practical usability on multi-step maths; the instruct model reaches ~49%</td></tr>
           <tr><td>Hallucination susceptibility</td><td>Phi-3 (16)</td><td>Not just less factual knowledge — actively produces confident falsehoods at higher rates</td></tr>
           <tr><td>RL exploration failure</td><td>Qwen3 (17)</td><td>Small models <em>need</em> distillation because they can't explore effectively through RL</td></tr>
           <tr><td>Overfitting SFT patterns</td><td>SFT-GRPO (15)</td><td>Small models latch onto training patterns harder, preventing RL from introducing novelty</td></tr>
@@ -522,9 +522,9 @@
       <p><strong>This means you can't just scale down a training recipe.</strong> Small models need qualitatively different approaches — distillation instead of RL, more aggressive data curation, and explicit safety alignment (Phi-3's DPO-based RAI). The synthesis's 2026 recipe (Insight #9) should bifurcate at a threshold (~3B params): above it, GRPO with exploration; below it, distillation from a larger model.</p>
 
       <!-- NEW INSIGHT 12: Incompatible Frameworks -->
-      <h2 style="font-family: 'Google Sans', sans-serif; font-size: 1.85rem; font-weight: 700; margin-top: 2.5rem;">12. DPO and GRPO Are Mathematically Incommensurable</h2>
+      <h2 style="font-family: 'Google Sans', sans-serif; font-size: 1.85rem; font-weight: 700; margin-top: 2.5rem;">12. DPO and GRPO Train on Different Signals</h2>
 
-      <p>The field uses two families of alignment methods that rest on fundamentally incompatible axioms — and no paper acknowledges this:</p>
+      <p>The field uses two families of alignment methods that train on different reward signals:</p>
 
       <table class="swi-table swi-table-striped">
         <thead>
@@ -532,19 +532,19 @@
         </thead>
         <tbody>
           <tr><td>Foundation</td><td>Bradley-Terry preference model</td><td>Group-relative advantage estimation</td></tr>
-          <tr><td>Axiom</td><td>Preferences are transitive comparisons</td><td>Rewards have cardinal values normalizable within groups</td></tr>
+          <tr><td>Axiom</td><td>Preferences are transitive comparisons</td><td>Rewards are scalar and normalisable within groups</td></tr>
           <tr><td>Data</td><td>Offline preference pairs (y_w, y_l)</td><td>Online sampled outputs with rule-based rewards</td></tr>
           <tr><td>Reference model</td><td>Required (in theory)</td><td>No value function, but needs old policy checkpoint</td></tr>
-          <tr><td>What "better" means</td><td>Pairwise: A > B</td><td>Cardinal: A = 0.7, B = 0.3</td></tr>
+          <tr><td>What "better" means</td><td>Pairwise: A > B</td><td>Scalar: a correctness score</td></tr>
         </tbody>
       </table>
 
-      <p>DPO assumes preferences are comparative (A is better than B). GRPO assumes rewards are evaluative (A scores 0.7/1.0). These are different philosophical frameworks for what "alignment" means. DPO's equivalence class theorem (Paper 10) proves that only relative differences between rewards matter — absolute values are meaningless. GRPO's reward function must provide meaningful absolute scores to compute group-relative advantages.</p>
+      <p>DPO trains on pairwise preferences: A is better than B. GRPO trains on scalar rewards, and DeepSeekMath's GRPO stage used binary correctness scores. DPO's equivalence class theorem (Paper 10) shows that only relative differences between rewards matter, so absolute values are meaningless. GRPO needs a scalar reward per sample to compute group-relative advantages.</p>
 
       <div class="swi-callout">
         <div class="swi-callout-icon">🧩</div>
         <div class="swi-callout-body">
-          <strong>The practical consequence:</strong> You can't directly compare DPO papers to GRPO papers. They're optimizing for different definitions of "better." When a paper reports "DPO underperforms GRPO on math," it's not measuring algorithm quality — it's measuring which type of data (pairwise preferences vs cardinal rewards) is more informative for that task.
+          <strong>The practical consequence:</strong> You can't directly compare DPO papers to GRPO papers. They're optimizing against different reward signals. When a paper reports "DPO underperforms GRPO on math," it's not measuring algorithm quality — it's measuring which type of data (pairwise preferences vs scalar rewards) is more informative for that task.
         </div>
       </div>
 
@@ -602,7 +602,7 @@
           <tr><th>Paper</th><th>Excluded</th><th>Why It Mattered</th></tr>
         </thead>
         <tbody>
-          <tr><td>Phi-1 (03)</td><td>40% of CodeExercises (contamination)</td><td>Removal only dropped performance marginally — data was redundant</td></tr>
+          <tr><td>Phi-1 (03)</td><td>40% of CodeExercises (contamination)</td><td>Removal cost ~5 points on HumanEval (50.6 → 45.1); the pruned model still beat StarCoder</td></tr>
           <tr><td>SFT-GRPO (15)</td><td>All SFT data from GRPO stage</td><td>Exclusion <em>improved</em> performance by +10.4pp</td></tr>
           <tr><td>SmolLM2 (04)</td><td>OWM math (little impact)</td><td>Excluding low-quality data prevented dilution</td></tr>
           <tr><td>Phi-3 (16)</td><td>Negative safety examples in SFT</td><td>Explicit refusal training required exclusion-based DPO</td></tr>
@@ -664,7 +664,7 @@
       <details class="swi-accordion">
         <summary>4. Can we factor models into "knowledge" and "scaffolding" components?</summary>
         <div class="swi-accordion-body">
-          Insight #3 suggests most parameters are scaffolding — they encode how knowledge is accessed, not the knowledge itself. If true, could we deploy just the knowledge component at dramatically smaller sizes? LoRA's finding that ΔW is orthogonal to W₀'s top singular directions suggests the structure is factorable. No paper attempts this factorization.
+          Insight #3 suggests most parameters are scaffolding — they encode how knowledge is accessed, not the knowledge itself. If true, could we deploy just the knowledge component at dramatically smaller sizes? LoRA's finding that ΔW amplifies directions under-emphasised in W₀ suggests the structure is factorable. No paper attempts this factorization.
         </div>
       </details>
 

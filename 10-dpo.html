@@ -657,22 +657,8 @@ implicit reward under the current policy.</code></pre>
       <h3 class="subtitle">IMDb Sentiment Control</h3>
 
       <p>
-        The authors evaluate DPO on a sentiment steering task, where the model must generate movie reviews with positive sentiment. The reward-KL frontier shows DPO achieving better reward at every level of KL divergence:
+        The authors evaluate DPO on a sentiment steering task, where the model must generate movie reviews with positive sentiment. Figure 2 (left) plots expected reward against KL divergence from the reference policy. DPO provides the highest expected reward across all KL values, dominating PPO, PPO with a ground-truth reward, and Best-of-N (N=128).
       </p>
-
-      <pre><code>IMDb Sentiment: Reward vs. KL Frontier
-
-Method              Reward (↑)    KL (↓)
-──────────────────────────────────────────
-PPO                 0.68          5.2
-PPO with GT reward  0.72          4.8
-Best-of-N (N=128)   0.74          6.1
-DPO (β=0.1)         0.76          3.9  ← Best frontier
-DPO (β=0.5)         0.71          2.8
-
-DPO dominates the reward-KL frontier at all
-KL levels, achieving higher reward with
-less divergence from the reference.</code></pre>
 
       <h3 class="subtitle">TL;DR Summarization</h3>
 
@@ -686,29 +672,20 @@ less divergence from the reference.</code></pre>
         </thead>
         <tbody>
           <tr><td>SFT (reference)</td><td>50% (baseline)</td><td>Standard supervised fine-tuning</td></tr>
-          <tr><td>PPO</td><td>57%</td><td>Standard RLHF</td></tr>
-          <tr><td>PPO with GT reward</td><td>59%</td><td>Upper bound with true reward</td></tr>
-          <tr><td class="swi-win">DPO</td><td class="swi-win">61%</td><td>Surpasses PPO with ground truth reward!</td></tr>
+          <tr><td>PPO</td><td>57%</td><td>At its optimal sampling temperature (0.0)</td></tr>
+          <tr><td class="swi-win">DPO</td><td class="swi-win">~61%</td><td>At temperature 0.0</td></tr>
         </tbody>
       </table>
 
       <p>
-        Remarkably, DPO <em>surpasses PPO with ground-truth reward</em>. This suggests that PPO's optimization challenges (instability, reward hacking) prevent it from fully exploiting even a perfect reward signal, while DPO's simpler objective avoids these failure modes.
+        DPO reaches a higher maximum win rate than PPO and than the Best-of-N baseline. The authors read this as evidence that PPO's optimisation challenges (instability, reward hacking) keep it from fully exploiting the reward signal, while DPO's simpler objective avoids them.
       </p>
 
       <h3 class="subtitle">Anthropic HH (Helpfulness &amp; Harmlessness)</h3>
 
       <p>
-        On the Anthropic helpful and harmless dialogue dataset:
+        On the Anthropic Helpful and Harmless dialogue dataset, Figure 3 (left) reports GPT-4 win rates for one-step dialogue. DPO is the only method that improves over the chosen responses in the test set.
       </p>
-
-      <pre><code>Anthropic HH: Win Rate vs. SFT Reference
-
-Method              Helpfulness    Harmlessness
-─────────────────────────────────────────────────
-PPO                 52%            54%
-Best-of-N (N=128)   56%            57%
-DPO                 57%            58%  ← Best on both</code></pre>
 
       <!-- SECTION 7: β Sensitivity -->
       <h2 class="title">The β Parameter</h2>

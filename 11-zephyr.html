@@ -490,18 +490,14 @@
 
       <pre><code>AIF Data Generation Process:
 
-1. Sample 64K prompts from the UltraChat training set
+1. Take the 64K prompts in the UltraFeedback dataset
 2. For each prompt, generate 4 candidate responses
    using the dSFT model (temperature 0.7)
 3. Score all 4 responses with GPT-4
 4. Select:
    - Best response (highest GPT-4 score) → chosen (y_w)
    - Worst response (lowest GPT-4 score) → rejected (y_l)
-5. Result: 64K (prompt, chosen, rejected) triples
-
-Total API calls: 64K × 4 = 256K GPT-4 calls
-Cost: ~$2,000 (at GPT-4 API pricing)
-Time: ~6 hours on a single machine</code></pre>
+5. Result: 64K (prompt, chosen, rejected) triples</code></pre>
 
       <p>
         The use of 4 candidates (rather than 2) provides richer signal: GPT-4 can rank all 4 and select the extreme pairs, which produces cleaner preference data than binary comparison. The chosen/rejected split is maximally informative — the best and worst responses differ the most in quality, making the DPO signal strongest.
@@ -525,7 +521,7 @@ Batch size:       64
 Warmup:           3% of steps
 Optimizer:        AdamW (β₁=0.9, β₂=0.95)
 Hardware:         16 × A100 80GB GPUs
-Training time:    ~2-4 hours</code></pre>
+Training time:    a few hours</code></pre>
 
       <div class="swi-callout">
         <div class="swi-callout-icon">💡</div>
@@ -617,19 +613,13 @@ Training time:    ~2-4 hours</code></pre>
         A surprising finding is that even when DPO overfits to the training preferences (100% training accuracy after 1 epoch), the model's quality on held-out benchmarks doesn't degrade:
       </p>
 
-      <pre><code>DPO Training Progression:
+      <pre><code>Zephyr-7B after dDPO (held-out benchmarks):
 
-Epoch  Train Acc   MT-Bench   AlpacaEval
-──────────────────────────────────────────
-  0       —         7.00       75.2%
-  1      94%        7.28       88.1%
-  2      99%        7.31       89.7%
-  3     100%        7.34       90.6%  ← Best
-  5     100%        7.30       90.2%  ← No degradation!
+  MT-Bench:    7.34
+  AlpacaEval:  90.6%
 
-Key: Overfitting in preference space appears benign.
-The model learns the preference PATTERN, not
-specific training examples.</code></pre>
+Key: the paper reports that DPO overfitting to the
+preference data does not degrade held-out performance.</code></pre>
 
       <p>
         This is fundamentally different from overfitting in supervised learning. In DPO, "overfitting" means the model perfectly ranks chosen over rejected in the training set. But this preference pattern generalizes — the model learns a consistent behavioral template (prefer helpful, detailed, accurate responses) that applies to unseen prompts as well. The overfitting is in the <em>ranking function</em>, not in specific content.

@@ -573,7 +573,7 @@ Checkpoint:        Manual selection (epoch 12 best on held-out quality)</code></
         Beyond pairwise comparisons, the authors also assess absolute response quality:
       </p>
 
-      <pre><code>LIMA Response Quality (300 prompts):
+      <pre><code>LIMA Response Quality (50 test prompts):
 
   Excellent:  50%  ← Half the time, responses are top-quality
   Pass:       38%  ← Acceptable but not outstanding
@@ -591,16 +591,8 @@ Checkpoint:        Manual selection (epoch 12 best on held-out quality)</code></
         LIMA was also evaluated on multi-turn conversations, which are more challenging than single-turn instruction following:
       </p>
 
-      <pre><code>Multi-Turn Quality (30 examples, 2 turns each):
-
-  Turn 1 (single-turn):  45% Excellent
-  Turn 2 (multi-turn):   76% Excellent
-
-  Key insight: Performance IMPROVES with context,
-  likely because additional context reduces ambiguity.</code></pre>
-
       <p>
-        The improvement from 45% to 76% in the "Excellent" category for multi-turn dialogue is surprising and suggests that LIMA's alignment is more robust than single-turn evaluation alone would indicate. When the model has more context, it can produce better responses even with limited SFT data.
+        LIMA was trained with no dialogue examples, yet the paper reports that it conducts coherent multi-turn dialogue. Adding just 30 hand-crafted dialogue chains to the training set improves that ability dramatically. The paper reports the multi-turn results in Section 6 and does not give a single-turn versus multi-turn percentage split.
       </p>
 
       <!-- SECTION 5: Ablations -->
@@ -647,14 +639,11 @@ Checkpoint:        Manual selection (epoch 12 best on held-out quality)</code></
         Perhaps the most striking result is the safety evaluation. LIMA includes only 13 safety-related training examples (1.3% of the dataset), yet produces responsible behavior:
       </p>
 
-      <pre><code>Safety Evaluation (300 prompts, red-teaming):
+      <pre><code>Safety Evaluation (30 sensitive prompts):
 
   Safe responses:     80%
   Unsafe responses:   20%
-
-  For comparison:
-  LLaMA-65B (base, no SFT):  ~40% safe
-  ChatGPT (reference):        ~95% safe</code></pre>
+  (6 of 10 prompts with malicious intent handled safely)</code></pre>
 
       <p>
         The 80% safety rate with only 13 examples suggests that safety is primarily a pre-training property — the model has learned during pre-training that certain topics require caution. The 13 SFT examples merely activate this pre-existing knowledge and teach the model to express it in a consistent format (e.g., "I cannot help with that, but I can suggest..."). The remaining 20% unsafe responses likely occur when the model's pre-training signal is insufficient (e.g., novel harmful prompts that weren't covered in pre-training data).

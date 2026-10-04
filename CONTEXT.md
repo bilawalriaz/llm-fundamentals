@@ -40,7 +40,7 @@ I have practical experience with Unsloth, SFT, and DPO but lacked deep fundament
 12. **ORPO** — Hong et al., 2024 — [arXiv:2403.07691](https://arxiv.org/abs/2403.07691) — Monolithic SFT+alignment, odds ratio, no reference model
 
 ### Tier 4: Advanced RL & Modern Pipelines
-13. **SFT-DPO Interaction** — Harry et al., 2026 — [arXiv:2603.20100](https://arxiv.org/abs/2603.20100) — FFT beats LoRA by more than SFT beats DPO (12:1 ratio)
+13. **SFT-DPO Interaction** — Feng & Yang, 2026 — [arXiv:2603.20100](https://arxiv.org/abs/2603.20100) — FFT beats LoRA by more than SFT beats DPO (12:1 ratio)
 14. **DeepSeekMath & GRPO** — Shao et al. (DeepSeek), 2024 — [arXiv:2402.03300](https://arxiv.org/abs/2402.03300) — PPO without value function, group-relative advantages, RL improves Maj@K not Pass@K
 15. **SFT-GRPO Data Overlap** — 2026 — [arXiv:2604.13515](https://arxiv.org/abs/2604.13515) — Disjoint data pools = free +10.4pp, reward saturation
 16. **Phi-3** — Microsoft, 2024 — [arXiv:2404.14219](https://arxiv.org/abs/2404.14219) — 3.8B on iPhone, LongRope, blocksparse attention, data-optimal regime
@@ -49,7 +49,7 @@ I have practical experience with Unsloth, SFT, and DPO but lacked deep fundament
 
 ---
 
-## 18 Novel Cross-Paper Insights (from synthesis)
+## 17 Novel Cross-Paper Insights and 7 Open Questions (from synthesis)
 
 ### Core Insights (1-9)
 
@@ -57,7 +57,7 @@ I have practical experience with Unsloth, SFT, and DPO but lacked deep fundament
 
 **2. Training is curriculum design.** Phi-1 (textbook→exercise), SmolLM2 (rebalance mid-flight), Qwen3 (cold start→RL→fusion→RL). The optimal data at each stage is different. The optimal objective at each stage is different.
 
-**3. Knowledge is 99% scaffolding.** LoRA rank 4-8, TinyStories 10M params, Phi-1 7B tokens, QLoRA 4-bit, LIMA 1,000 examples — all suggest actual knowledge is far lower-dimensional than parameter count implies.
+**3. Knowledge is far more compressible than the parameter count implies.** LoRA rank 4-8, TinyStories under 10M params, Phi-1 7B tokens, QLoRA 4-bit, LIMA 1,000 examples — all point the same way: the actual knowledge content is far lower-dimensional than the parameter count suggests, and most parameters look like scaffolding.
 
 **4. The evaluation crisis is the real bottleneck.** GPT-4 as judge: τ=0.43 with humans. Paper 13's 12:1 finding was only discovered through careful ablations. Most papers don't run them.
 
@@ -71,25 +71,27 @@ I have practical experience with Unsloth, SFT, and DPO but lacked deep fundament
 
 **9. The implicit 2026 recipe.** Pretrain curated → SFT 1K-50K high-quality → GRPO for verifiable tasks, DPO for subjective → Distill strong-to-weak → Deploy INT4 → Evaluate honestly across parameterizations.
 
-### Advanced Insights (10-18)
+### Advanced Insights (10-17)
 
-**10. All post-training is distribution shaping, not knowledge addition.** LoRA learns orthogonal deltas. GRPO improves Maj@K not Pass@K. DPO reweights existing outputs. Every method concentrates probability mass on desired regions. Knowledge is surfaced, not added.
+**10. All post-training is distribution shaping, not knowledge addition.** LoRA amplifies task-specific directions the pre-training under-emphasised. GRPO improves Maj@K not Pass@K. DPO reweights existing outputs. Every method concentrates probability mass on desired regions. Knowledge is surfaced, not added.
 
-**11. Small models have qualitatively different failure modes.** Phi-1 counting failures are structural. SmolLM2 math ceiling at 32%. Small models can't explore via RL. They need distillation, not scaled-down recipes.
+**11. Small models have qualitatively different failure modes.** Phi-1 counting failures are structural. SmolLM2's 1.7B base model plateaus at ~32% on GSM8K. Small models can't explore via RL. They need distillation, not scaled-down recipes.
 
-**12. DPO and GRPO are mathematically incommensurable.** DPO assumes transitive preferences (A > B). GRPO assumes cardinal rewards (A=0.7, B=0.3). Different axioms about what "better" means. You can't directly compare papers using different frameworks.
+**12. DPO and GRPO train on different signals.** DPO trains on pairwise preferences (A > B); GRPO trains on scalar rewards, and DeepSeekMath's GRPO stage used binary correctness scores. Those are different data types, so a DPO paper and a GRPO paper are not directly comparable.
 
 **13. No technique reduces total compute — they shift it.** QLoRA: memory→compute. GRPO: critic→64× samples. LoRA: trainable→frozen. Blocksparse: KV cache→pattern overhead. Each trades one resource for another.
 
 **14. Teacher quality ceiling is unavoidable.** GPT-4 bounds Phi-1 data. GPT-4 bounds ZEPHYR alignment. 235B bounds Qwen3 student. GPT-4 bounds evaluation (τ=0.43). No demonstrated path to super-LLM through AI feedback alone.
 
-**15. Negative data blind spot.** Phi-1 removed 40% — barely hurt. SFT-GRPO overlap: exclusion *improved* by +10pp. What you exclude matters as much as what you include. No theory of training data toxicity.
+**15. Negative data blind spot.** Phi-1 removed 40% of its code-exercise data and still beat StarCoder, though HumanEval fell 5.5 points. SFT-GRPO overlap: exclusion *improved* results by +10.4pp. What you exclude matters as much as what you include. No theory of training data toxicity.
 
 **16. Context extension: 3 papers, 3 methods, 0 comparisons.** Phi-3 (LongRope), Qwen3 (ABF+YARN), SmolLM2 (RoPE scaling). Nobody has compared head-to-head.
 
-**17. Seven questions the field should be asking.** Information-theoretic lower bound on data. Why code→math transfer is one-way. When online RL becomes net beneficial. Can we factor models into knowledge + scaffolding. Optimal synthetic/real data ratio. What SFT-GRPO overlap really means. What defines "done."
+**17. Creative Writing GRPO: Reward-Modelled, Not Verified.** (Corrected after peer review — see below.)
 
-**18. Creative Writing GRPO: Reward-Modelled, Not Verified.** (Corrected after peer review — see below.)
+### 7 Open Questions
+
+Information-theoretic lower bound on data. Why code→math transfer is one-way. When online RL becomes net beneficial. Can we factor models into knowledge + scaffolding. Optimal synthetic/real data ratio. What SFT-GRPO overlap really means. What defines "done."
 
 ---
 
@@ -209,7 +211,7 @@ Same loop, but replace "real-world verifiers" with "trained reward classifier" +
 ├── synthesis.md               # Structured synthesis (raw)
 ├── html/
 │   ├── index.html             # Landing page with 4-tier reading order
-│   ├── synthesis.html         # 18 insights + 7 open questions (peer-reviewed)
+│   ├── synthesis.html         # 17 insights + 7 open questions (peer-reviewed)
 │   ├── 01-illustrated-transformer.html
 │   ├── 02-tinystories.html
 │   ├── 03-phi-1-textbooks.html

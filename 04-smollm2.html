@@ -485,7 +485,7 @@ where:
 
       <ul>
         <li><strong>Benchmark gap with larger models:</strong> On knowledge-intensive tasks (MMLU), SmolLM2-1.7B still lags significantly behind 7B+ models. Small models have inherent capacity limits for factual knowledge.</li>
-        <li><strong>Math ceiling:</strong> While FineMath improves mathematical reasoning, the 1.7B model still struggles with multi-step mathematical problems. GSM8K performance (32.7%) is far below practical usability.</li>
+        <li><strong>Math limits:</strong> While FineMath improves mathematical reasoning, the 1.7B base model still struggles with multi-step mathematical problems. GSM8K performance (32.7%) is far below practical usability; the instruct model reaches about 49%.</li>
         <li><strong>Code complexity:</strong> HumanEval at 38.4% is respectable but insufficient for production code generation. Complex, multi-file coding tasks remain beyond reach.</li>
         <li><strong>Training compute:</strong> 11T tokens across three model sizes represents significant compute investment, even if individual models are small.</li>
         <li><strong>Evaluation limitations:</strong> Many benchmarks don't capture real-world utility. A model's value depends on specific use cases, not aggregate scores.</li>
